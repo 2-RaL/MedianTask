@@ -1,4 +1,4 @@
-<!doctype html><html lang="az"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#173e34"><title>Meridian · İş məkanı</title><link rel="stylesheet" href="/style.css"><script defer src="/vendor/vue.js"></script><script defer src="/vendor/read-excel-file.min.js"></script><script defer src="/app.js"></script></head><body><div id="app" v-cloak>
+<!doctype html><html lang="az"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#173e34"><title>Meridian · İş məkanı</title><link rel="stylesheet" href="/style.css?v=2"><script defer src="/vendor/vue.js"></script><script defer src="/vendor/read-excel-file.min.js"></script><script defer src="/app.js?v=2"></script></head><body><div id="app" v-cloak>
 <div v-if="!ready" class="loading">Meridian</div>
 <div v-else-if="!s" class="login">
 <section class="cover">
@@ -87,8 +87,8 @@
 </svg>
 <div class="covertext"><small>KOMANDA ÜÇÜN İŞ MƏKANI</small><h1>Layihələriniz bir yerdə.</h1></div></section>
 <section class="loginform"><small>MERIDIAN WORKSPACE</small><h1>Hesabınıza daxil olun</h1><p>İş məkanınıza şirkət hesabınızla keçin.</p><form @submit.prevent="login"><label>E-poçt<input type="email" autocomplete="username" v-model="auth.email" required></label><label>Şifrə<input type="password" autocomplete="current-password" v-model="auth.password" required></label><p class="error" role="alert" v-if="error">{{error}}</p><button ref="loginSubmit" class="primary wide" :disabled="busy">Daxil ol <span>→</span></button></form>
-<div class="demobox autofill-access">
-  <small>AVTOMATİK DOLDURMA (AUTO FILL)</small>
+<div class="demobox presentation-access autofill-access">
+  <small>TƏQDİMAT ÜÇÜN SÜRƏTLİ GİRİŞ</small>
   <div class="autofill-list">
     <button v-for="u in autoFillUsers" :key="u.email" type="button" :class="{active:auth.email===u.email}" :disabled="busy" @click="fillUser(u)" :title="`${u.label}: ${u.email}`">{{u.label}}</button>
   </div>
