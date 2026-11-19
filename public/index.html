@@ -85,7 +85,27 @@
   <g data-ribbon-front aria-hidden="true"></g>
 </svg>
 <div class="covertext"><small>KOMANDA ÜÇÜN İŞ MƏKANI</small><h1>Layihələriniz bir yerdə.</h1></div></section>
-<section class="loginform"><small>MERIDIAN WORKSPACE</small><h1>Hesabınıza daxil olun</h1><p>İş məkanınıza şirkət hesabınızla keçin.</p><form @submit.prevent="login"><label>E-poçt<input type="email" autocomplete="username" v-model="auth.email" required></label><label>Şifrə<input type="password" autocomplete="current-password" v-model="auth.password" required></label><p class="error" role="alert" v-if="error">{{error}}</p><button class="primary wide" :disabled="busy">Daxil ol <span>→</span></button></form><div v-if="demo" class="demobox"><small>DEMO HESABI İLƏ SÜRƏTLİ GİRİŞ</small><div><button v-for="o in demos" :key="o[1]" type="button" @click="demoLogin(o[1])" :disabled="busy">{{o[0]}}</button></div></div></section></div>
+<section class="loginform"><small>MERIDIAN WORKSPACE</small><h1>Hesabınıza daxil olun</h1><p>İş məkanınıza şirkət hesabınızla keçin.</p><form @submit.prevent="login"><label>E-poçt<input type="email" autocomplete="username" v-model="auth.email" required></label><label>Şifrə<input type="password" autocomplete="current-password" v-model="auth.password" required></label><p class="error" role="alert" v-if="error">{{error}}</p><button ref="loginSubmit" class="primary wide" :disabled="busy">Daxil ol <span>→</span></button></form>
+<div v-if="presentation" class="demobox presentation-access">
+  <small>TƏQDİMAT ÜÇÜN SÜRƏTLİ GİRİŞ</small>
+  <div>
+    <button v-for="role in presentationRoles" :key="role.id" type="button" :disabled="busy || !preparedRoles.includes(role.id)" @click="fillPresentation(role.id)">{{role.label}}</button>
+  </div>
+  <details>
+    <summary>Hesabları bu tab üçün hazırla</summary>
+    <p>Məlumatları bir dəfə daxil edin. Səhifə yenilənəndə və ya bağlananda onlar silinir.</p>
+    <form v-for="role in presentationRoles" :key="role.id" autocomplete="off" @submit.prevent="preparePresentation(role.id,$event.currentTarget)">
+      <fieldset>
+        <legend>{{role.label}}</legend>
+        <label>E-poçt<input name="email" type="email" autocomplete="off" required></label>
+        <label>Şifrə<input name="password" type="password" autocomplete="off" required></label>
+        <button type="submit">{{preparedRoles.includes(role.id)?'Yenilə':'Hazırla'}}</button>
+      </fieldset>
+    </form>
+  </details>
+  <button v-if="preparedRoles.length" type="button" :disabled="busy" @click="clearPresentation">Məlumatları sil</button>
+</div>
+<div v-if="demo" class="demobox"><small>DEMO HESABI İLƏ SÜRƏTLİ GİRİŞ</small><div><button v-for="o in demos" :key="o[1]" type="button" @click="demoLogin(o[1])" :disabled="busy">{{o[0]}}</button></div></div></section></div>
 <div v-else class="shell"><aside :class="{opened:mobile}"><img class="brand" src="/meridian-logo.png" alt="MERİDİAN" width="2172" height="724"><div class="space"><b class="monogram">{{initials(s.company?.name||'Meridian')}}</b><div><strong>{{s.company?.name||'Meridian'}}</strong><small>{{isPlatform?'Platforma paneli':'Şirkət məkanı'}}</small></div></div><small class="navcaption">İDARƏETMƏ</small><nav><button v-for="n in nav" @click="go(n[0])" :class="{current:page===n[0]}"><ico :name="n[2]"></ico>{{n[1]}}</button></nav>
 <div v-if="!isPlatform" class="sideProjects"><small class="navcaption">LAYİHƏLƏR</small><button v-for="(p,i) in s.projects" @click="go('board');project=p.id"><i :class="'dot tone'+i%4"></i>{{p.name}}</button><button v-if="admin" @click="open('project')">＋ Layihə yarat</button></div><div class="sidefoot"><b class="avatar">{{initials(s.me.name)}}</b><div><strong>{{s.me.name}}</strong><small>{{roleName(s.me.role)}}</small></div><button class="logout" title="Çıxış" aria-label="Çıxış" @click="logout"><ico name="logout"></ico></button></div></aside><button v-if="mobile" class="scrim" aria-label="Menyunu bağla" @click="mobile=false"></button>
 <main><header><div><button class="menuBtn" @click="mobile=true" aria-label="Menyu"><ico name="menu"></ico></button><ico name="grid"></ico><span>{{isPlatform?'Platforma':'İş məkanı'}}</span><em>/</em><b>{{pageName}}</b></div><span class="today">{{today}}</span></header>

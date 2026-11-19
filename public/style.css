@@ -40,6 +40,24 @@
   stroke-linecap: round;
 }
 
+.presentation-access details {
+  margin: 14px 0;
+}
+
+.presentation-access summary {
+  cursor: pointer;
+}
+
+.presentation-access form {
+  margin: 10px 0;
+}
+
+.presentation-access fieldset {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+
 @media (max-width: 680px) {
   .login {
     grid-template-columns: minmax(0, 1fr);
