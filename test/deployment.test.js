@@ -17,14 +17,14 @@ test('Build, birbaşa və require ilə işəsalma, HTTPS proxy və redeploy sonr
   const data = join(root,'persistent');
   const appOrigin='https://meridian.example';
   const pass='DeploymentCheck2026';
-  async function start(folder, loadWithRequire = false) {
+  async function start(folder, { loadWithRequire = false, adminEmailKey = 'ADMIN_EMAIL' } = {}) {
     await cp(join(source,'dist'), folder, {recursive:true});
     await writeFile(join(folder,'.env'), [
       'NODE_ENV=production',
       'PORT=0',
       'DATA_DIR='+data,
       'APP_URL='+appOrigin,
-      'ADMIN_EMAIL=owner@example.com',
+      adminEmailKey+'=owner@example.com',
       'ADMIN_PASSWORD='+pass,
     ].join('\n'));
     // PORT=0 seçimini testdəki serverin elan etdiyi porta bağlamaq üçün logu genişləndiririk.
@@ -43,7 +43,7 @@ test('Build, birbaşa və require ilə işəsalma, HTTPS proxy və redeploy sonr
   }
   async function stop(){const exited=once(child,'exit');child.kill('SIGTERM');await exited;child=null;}
   t.after(async()=>{if(child)await stop()});
-  let url=await start(join(root,'release-one'));
+  let url=await start(join(root,'release-one'), { adminEmailKey: 'ADMIIN_EMAIL' });
   assert.equal((await fetch(url+'/api/health')).status,200);
   assert.equal((await fetch(url+'/')).status,200);
   async function login(){
@@ -56,7 +56,7 @@ test('Build, birbaşa və require ilə işəsalma, HTTPS proxy və redeploy sonr
   const r=await fetch(url+'/api/plan',{method:'POST',headers:{'Content-Type':'application/json',Origin:appOrigin,Cookie:cookie},body:JSON.stringify({name:'Persistent plan',seats:25,monthly:29})});
   assert.equal(r.status,200);
   await stop();
-  url=await start(join(root,'release-two'), true);
+  url=await start(join(root,'release-two'), { loadWithRequire: true });
   assert.equal((await fetch(url+'/api/health')).status,200);
   cookie=await login();
   const state=await (await fetch(url+'/api/state',{headers:{Cookie:cookie}})).json();

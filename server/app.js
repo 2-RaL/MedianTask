@@ -43,9 +43,11 @@ function user(name,mail,pass,role,company){return insert('INSERT INTO users(name
 function choose(v,items){if(!items.includes(v))fail('Seçim yanlışdır.');return v;}
 const statuses=['todo','doing','review','done'], priorities=['low','normal','high'];
 if(!one('SELECT id FROM users LIMIT 1'))tx(()=>{
-  if(!demo&&(!process.env.ADMIN_EMAIL||!process.env.ADMIN_PASSWORD))throw Error('İlk açılış üçün ADMIN_EMAIL və ADMIN_PASSWORD dəyişənlərini təyin edin.');
+  // Accept the legacy spelling used by the initial Hostinger deployment.
+  const adminEmail = process.env.ADMIN_EMAIL || process.env.ADMIIN_EMAIL;
+  if(!demo&&(!adminEmail||!process.env.ADMIN_PASSWORD))throw Error('İlk açılış üçün ADMIN_EMAIL və ADMIN_PASSWORD dəyişənlərini təyin edin.');
   const plan=insert('INSERT INTO plans(name,seats) VALUES(?,?)','Business',12);
-  user('Platforma administratoru',demo?'platform@meridian.test':process.env.ADMIN_EMAIL,demo?'MeridianDemo2026':process.env.ADMIN_PASSWORD,'platform',null);
+  user('Platforma administratoru',demo?'platform@meridian.test':adminEmail,demo?'MeridianDemo2026':process.env.ADMIN_PASSWORD,'platform',null);
   if(!demo)return;
   const c=insert('INSERT INTO companies(name,plan) VALUES(?,?)','Atelier Studio',plan);
   const a=user('Leyla Məmmədova','leyla@meridian.test','MeridianDemo2026','admin',c);
