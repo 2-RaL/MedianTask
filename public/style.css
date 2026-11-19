@@ -15,7 +15,7 @@
 
 .sculpture {
   position: absolute;
-  inset: 12% -15% 22% 17%;
+  inset: 22% -15% 12% 17%;
   z-index: -1;
   pointer-events: none;
   transform: rotate(-17deg);
@@ -87,7 +87,7 @@
   }
 
   .login-brand { width: min(68vw, 285px); }
-  .sculpture { inset: 0 -5% -5% 52%; }
+  .sculpture { inset: 6% -5% -11% 52%; }
 
   .loginform {
     grid-area: 2 / 1;
