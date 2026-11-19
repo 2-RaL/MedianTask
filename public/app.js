@@ -49,4 +49,85 @@ const app=createApp({
  }
 });
 app.component('ico',{props:['name'],setup(){return {icons}},template:'<svg class="ico" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path :d="icons[name]"/></svg>'});
+const orbitStops = new WeakMap();
+app.directive('logo-orbit', {
+  mounted(svg) {
+    const centerX = 622;
+    const centerY = 168;
+    const ribbonCount = 12;
+    const backLayer = svg.querySelector('[data-ribbon-back]');
+    const frontLayer = svg.querySelector('[data-ribbon-front]');
+    const ribbons = Array.from({ length: ribbonCount }, (_, index) => {
+      const gold = index % 2 === 0;
+      const tilt = (-32 + (index - 5.5) * 4.2) * Math.PI / 180;
+      function makePath(layer, opacity) {
+        const path = document.createElementNS(svg.namespaceURI, 'path');
+        path.setAttribute('fill', 'none');
+        path.setAttribute('stroke', gold ? 'url(#mGoldRibbon)' : 'url(#mGreenRibbon)');
+        path.setAttribute('stroke-width', gold ? 2.4 + (index % 3) * .6 : 2.8);
+        path.setAttribute('stroke-linecap', 'round');
+        path.setAttribute('opacity', opacity);
+        layer.append(path);
+        return path;
+      }
+      return {
+        back: makePath(backLayer, .4),
+        front: makePath(frontLayer, .95),
+        radiusX: 95 + (index % 4) * 14,
+        radiusY: 36 + (index % 3) * 9,
+        phase: index / ribbonCount * Math.PI * 2,
+        speed: 1.8 + (index % 3) * .22,
+        cosTilt: Math.cos(tilt),
+        sinTilt: Math.sin(tilt),
+      };
+    });
+
+    function draw(elapsed) {
+      for (const ribbon of ribbons) {
+        const head = elapsed * ribbon.speed + ribbon.phase;
+        let front = '';
+        let back = '';
+        let wasInFront;
+        for (let point = 0; point <= 24; point++) {
+          const angle = head - point * 2.2 / 24;
+          const depth = Math.sin(angle);
+          const x = Math.cos(angle) * ribbon.radiusX;
+          const y = depth * ribbon.radiusY;
+          const inFront = depth >= 0;
+          const projectedX = centerX + x * ribbon.cosTilt - y * ribbon.sinTilt;
+          const projectedY = centerY + x * ribbon.sinTilt + y * ribbon.cosTilt;
+          const sample = `${wasInFront === inFront ? 'L' : 'M'}${projectedX.toFixed(1)} ${projectedY.toFixed(1)} `;
+          if (inFront) front += sample;
+          else back += sample;
+          wasInFront = inFront;
+        }
+        ribbon.front.setAttribute('d', front);
+        ribbon.back.setAttribute('d', back);
+      }
+    }
+
+    const motion = matchMedia('(prefers-reduced-motion: reduce)');
+    const startedAt = performance.now();
+    let frame;
+    function animate(now) {
+      draw((now - startedAt) / 1000);
+      frame = requestAnimationFrame(animate);
+    }
+    function updateMotion() {
+      cancelAnimationFrame(frame);
+      if (motion.matches) draw(0);
+      else frame = requestAnimationFrame(animate);
+    }
+    updateMotion();
+    motion.addEventListener('change', updateMotion);
+    orbitStops.set(svg, () => {
+      cancelAnimationFrame(frame);
+      motion.removeEventListener('change', updateMotion);
+    });
+  },
+  unmounted(svg) {
+    orbitStops.get(svg)?.();
+    orbitStops.delete(svg);
+  },
+});
 app.mount('#app');

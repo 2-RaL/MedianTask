@@ -2,7 +2,61 @@
 <div v-if="!ready" class="loading">Meridian</div>
 <div v-else-if="!s" class="login">
 <section class="cover"><div class="covertext"><small>KOMANDA ÜÇÜN İŞ MƏKANI</small><h1>Layihələriniz bir yerdə.</h1></div></section>
-<div class="sculpture-orbit" aria-hidden="true"><div class="sculpture"><i v-for="i in 14" :style="{'--i':i}"></i></div></div><img class="brand login-brand" src="/meridian-logo.png" alt="MERİDİAN" width="2172" height="724">
+<svg viewBox="0 0 1120 320" class="brand login-brand" role="img" aria-label="MERİDİAN" v-logo-orbit>
+  <defs>
+    <linearGradient id="mGoldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#8A683C" />
+      <stop offset="45%" stop-color="#DFC08D" />
+      <stop offset="100%" stop-color="#9E7B4F" />
+    </linearGradient>
+    <linearGradient id="mGreenRibbon" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#0B2818" stop-opacity="0.15" />
+      <stop offset="50%" stop-color="#195434" stop-opacity="0.95" />
+      <stop offset="100%" stop-color="#0B2818" stop-opacity="0.15" />
+    </linearGradient>
+    <linearGradient id="mGoldRibbon" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#9E7B4F" stop-opacity="0.1" />
+      <stop offset="50%" stop-color="#E5C694" stop-opacity="1" />
+      <stop offset="100%" stop-color="#9E7B4F" stop-opacity="0.1" />
+    </linearGradient>
+  </defs>
+
+  <g data-ribbon-back aria-hidden="true"></g>
+  <g transform="translate(65, 95)" class="logo-letter">
+    <path d="M0,150 L7,6 L12,6 L62,82 L112,6 L117,6 L124,150 L114,150 L108,30 L64,96 L60,96 L16,30 L10,150 Z" />
+  </g>
+  <g transform="translate(245, 95)" class="logo-letter">
+    <path d="M0,6 L76,6 L76,16 L12,16 L12,72 L66,72 L66,82 L12,82 L12,140 L76,140 L76,150 L0,150 Z" />
+  </g>
+  <g transform="translate(375, 95)" class="logo-letter">
+    <path d="M0,6 L42,6 C68,6 84,20 84,44 C84,65 70,78 48,81 L88,150 L75,150 L36,83 L12,83 L12,150 L0,150 Z M12,16 L12,73 L41,73 C61,73 72,62 72,44 C72,26 61,16 41,16 Z" />
+  </g>
+  <g transform="translate(505, 95)" class="logo-letter">
+    <circle cx="6" cy="-16" r="5.5" />
+    <rect x="0" y="6" width="12" height="144" rx="1.5" />
+  </g>
+  <g transform="translate(565, 78)">
+    <path fill="none" stroke="url(#mGoldGrad)" stroke-width="6" stroke-linecap="round" d="M 10,122 C -32,126 -35,95 15,68" />
+    <path
+      class="logo-letter"
+      d="M -4,8 C 64,4 116,40 116,92 C 116,144 64,180 -4,176 L 2,169 L 2,15 Z M 16,18 L 16,86 L 56,86 C 55,50 40,24 16,18 Z M 64,86 L 101,86 C 98,48 72,22 36,18 C 52,30 62,55 64,86 Z M 16,96 L 16,166 C 40,160 55,134 56,96 Z M 64,96 C 62,127 52,152 36,164 C 72,160 98,134 101,96 Z"
+    />
+    <path fill="none" stroke="url(#mGoldGrad)" stroke-width="7.5" stroke-linecap="round" d="M -18,118 C 22,138 118,86 138,44 C 145,29 132,20 110,28" />
+    <circle cx="134" cy="31" r="8.5" fill="url(#mGoldGrad)" />
+  </g>
+
+  <g data-ribbon-front aria-hidden="true"></g>
+  <g transform="translate(745, 95)" class="logo-letter">
+    <circle cx="6" cy="-16" r="5.5" />
+    <rect x="0" y="6" width="12" height="144" rx="1.5" />
+  </g>
+  <g transform="translate(815, 95)" class="logo-letter">
+    <path d="M0,150 L50,6 L56,6 L106,150 L93,150 L78,107 L28,107 L13,150 Z M32,96 L74,96 L53,32 Z" />
+  </g>
+  <g transform="translate(965, 95)" class="logo-letter">
+    <path d="M0,150 L0,6 L9,6 L83,132 L83,6 L94,6 L94,150 L85,150 L11,24 L11,150 Z" />
+  </g>
+</svg>
 <section class="loginform"><small>MERIDIAN WORKSPACE</small><h1>Hesabınıza daxil olun</h1><p>İş məkanınıza şirkət hesabınızla keçin.</p><form @submit.prevent="login"><label>E-poçt<input type="email" autocomplete="username" v-model="auth.email" required></label><label>Şifrə<input type="password" autocomplete="current-password" v-model="auth.password" required></label><p class="error" role="alert" v-if="error">{{error}}</p><button class="primary wide" :disabled="busy">Daxil ol <span>→</span></button></form><div v-if="demo" class="demobox"><small>DEMO HESABI İLƏ SÜRƏTLİ GİRİŞ</small><div><button v-for="o in demos" :key="o[1]" type="button" @click="demoLogin(o[1])" :disabled="busy">{{o[0]}}</button></div></div></section></div>
 <div v-else class="shell"><aside :class="{opened:mobile}"><img class="brand" src="/meridian-logo.png" alt="MERİDİAN" width="2172" height="724"><div class="space"><b class="monogram">{{initials(s.company?.name||'Meridian')}}</b><div><strong>{{s.company?.name||'Meridian'}}</strong><small>{{isPlatform?'Platforma paneli':'Şirkət məkanı'}}</small></div></div><small class="navcaption">İDARƏETMƏ</small><nav><button v-for="n in nav" @click="go(n[0])" :class="{current:page===n[0]}"><ico :name="n[2]"></ico>{{n[1]}}</button></nav>
 <div v-if="!isPlatform" class="sideProjects"><small class="navcaption">LAYİHƏLƏR</small><button v-for="(p,i) in s.projects" @click="go('board');project=p.id"><i :class="'dot tone'+i%4"></i>{{p.name}}</button><button v-if="admin" @click="open('project')">＋ Layihə yarat</button></div><div class="sidefoot"><b class="avatar">{{initials(s.me.name)}}</b><div><strong>{{s.me.name}}</strong><small>{{roleName(s.me.role)}}</small></div><button class="logout" title="Çıxış" aria-label="Çıxış" @click="logout"><ico name="logout"></ico></button></div></aside><button v-if="mobile" class="scrim" aria-label="Menyunu bağla" @click="mobile=false"></button>
