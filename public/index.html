@@ -1,4 +1,4 @@
-<!doctype html><html lang="az"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#173e34"><title>Meridian · İş məkanı</title><link rel="stylesheet" href="/style.css?v=2"><script defer src="/vendor/vue.js"></script><script defer src="/vendor/read-excel-file.min.js"></script><script defer src="/app.js?v=2"></script></head><body><div id="app" v-cloak>
+<!doctype html><html lang="az"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#173e34"><title>Meridian · İş məkanı</title><link rel="stylesheet" href="/style.css?v=3"><script defer src="/vendor/vue.js"></script><script defer src="/vendor/read-excel-file.min.js"></script><script defer src="/app.js?v=3"></script></head><body><div id="app" v-cloak>
 <div v-if="!ready" class="loading">Meridian</div>
 <div v-else-if="!s" class="login">
 <section class="cover">
@@ -106,7 +106,154 @@
 <div v-if="view==='board'" class="kanban"><section v-for="(n,k) in statuses" class="lane" :class="['l'+k,{over:over===k}]" @dragover.prevent="over=k" @dragleave="over=''" @drop.prevent="drop(k)"><h3><i class="dot"></i>{{n}} <b>{{filtered.filter(t=>t.status===k).length}}</b><button v-if="admin" title="Tapşırıq əlavə et" @click="newTask(k)">＋</button></h3><button v-for="t in filtered.filter(t=>t.status===k)" class="card" :draggable="admin||t.owner===s.me.id" @dragstart="drag=t" @dragend="drag=null;over=''" @click="detail(t)"><small class="projectname"><i :class="'dot tone'+projectIndex(t.project)"></i>{{projectName(t.project)}}</small><h4>{{t.title}}</h4><span :class="['priority',t.priority]">{{priorities[t.priority]}}</span><footer><span :class="{late:late(t)}"><ico name="date"></ico>{{dateLabel(t.due)}}</span><b :class="'avatar v'+(t.owner||0)%4" :title="person(t.owner)">{{initials(person(t.owner))}}</b></footer></button><div v-if="!filtered.some(t=>t.status===k)" class="emptyLane">Tapşırıq yoxdur</div></section></div>
 <div v-else class="panel scroll"><table><thead><tr><th>Tapşırıq</th><th>Layihə</th><th>Məsul şəxs</th><th>Mərhələ</th><th>Son tarix</th></tr></thead><tbody><tr v-for="t in filtered"><td><button class="link" @click="detail(t)">{{t.title}}</button></td><td>{{projectName(t.project)}}</td><td>{{person(t.owner)}}</td><td>{{statuses[t.status]}}</td><td>{{dateLabel(t.due)}}</td></tr></tbody></table><p v-if="!filtered.length" class="emptyLane">Tapşırıq tapılmadı.</p></div>
 </template>
-<template v-if="page==='reports'"><div class="metrics"><article v-for="m in boardMetrics"><span><ico :name="m[2]"></ico>{{m[0]}}</span><strong>{{m[1]}}</strong></article></div><div class="reports"><section class="panel"><small>LAYİHƏLƏR ÜZRƏ</small><h2>İcra səviyyəsi</h2><div v-for="p in s.projects" class="progressrow"><b>{{p.name}}</b><span>{{percent(p.id)}}%</span><progress max="100" :value="percent(p.id)"></progress></div><p v-if="!s.projects.length">Hələ layihə yoxdur.</p></section><section class="panel"><small>ƏMƏKDAŞLAR ÜZRƏ</small><h2>Açıq tapşırıqlar</h2><div v-for="u in s.users.filter(u=>u.active||s.tasks.some(t=>t.owner===u.id&&t.status!=='done'))" class="workrow"><b class="avatar">{{initials(u.name)}}</b><span>{{u.name}}</span><b>{{s.tasks.filter(t=>t.owner===u.id&&t.status!=='done').length}}</b></div></section></div></template>
+<template v-if="page==='reports'">
+<div class="metrics"><article v-for="m in boardMetrics" :key="m[0]"><span><ico :name="m[2]"></ico>{{m[0]}}</span><strong>{{m[1]}}</strong><small v-if="m[3]" class="metric-sub">{{m[3]}}</small></article></div>
+<div class="reports">
+  <section class="panel chart-card">
+    <div class="chart-header">
+      <div><small>MƏRHƏLƏLƏR ÜZRƏ</small><h2>İcra Vəziyyəti</h2></div>
+      <span class="badge-pill">{{reportStats.total}} tapşırıq</span>
+    </div>
+    <div class="segmented-bar" aria-label="Mərhələ bölgüsü">
+      <div v-for="st in reportStats.statuses" :key="st.key" class="seg-item" :style="{ width: st.pct + '%', background: st.color }" :title="`${st.label}: ${st.count} (${st.pct}%)`"></div>
+    </div>
+    <div class="v-chart-container">
+      <div v-for="st in reportStats.statuses" :key="st.key" class="v-chart-col">
+        <span class="v-chart-count">{{st.count}}</span>
+        <div class="v-chart-track">
+          <div class="v-chart-bar" :style="{ height: Math.max(st.barPct, st.count ? 8 : 0) + '%', background: st.color }" :title="`${st.label}: ${st.count} (${st.pct}%)`"></div>
+        </div>
+        <span class="v-chart-label">{{st.label}}</span>
+        <span class="v-chart-pct">{{st.pct}}%</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel chart-card">
+    <div class="chart-header">
+      <div><small>DƏRƏCƏLƏNDİRMƏ</small><h2>Prioritet Bölgüsü</h2></div>
+    </div>
+    <div class="priority-chart-row">
+      <div class="donut-wrap">
+        <svg viewBox="0 0 100 100" class="donut-chart" role="img" aria-label="Prioritet bölgüsü">
+          <circle cx="50" cy="50" r="40" fill="transparent" stroke="#edece4" stroke-width="11" />
+          <circle v-for="seg in reportStats.donutSegments" :key="seg.key" v-if="seg.count" cx="50" cy="50" r="40" fill="transparent" :stroke="seg.color" stroke-width="11" :stroke-dasharray="seg.dasharray" :stroke-dashoffset="seg.dashoffset" transform="rotate(-90 50 50)" />
+          <text x="50" y="47" text-anchor="middle" class="donut-total">{{reportStats.total}}</text>
+          <text x="50" y="61" text-anchor="middle" class="donut-caption">tapşırıq</text>
+        </svg>
+      </div>
+      <div class="priority-legend">
+        <div v-for="p in reportStats.priorities" :key="p.key" class="p-legend-item">
+          <div class="p-legend-head">
+            <span class="p-legend-dot" :style="{ background: p.color }"></span>
+            <b class="p-legend-name">{{p.label}}</b>
+            <span class="p-legend-nums">{{p.count}} <em>({{p.pct}}%)</em></span>
+          </div>
+          <div class="h-bar-track">
+            <div class="h-bar-fill" :style="{ width: p.pct + '%', background: p.color }"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel chart-card">
+    <div class="chart-header">
+      <div><small>{{admin ? 'BÜTÜN LAYİHƏLƏR' : 'İŞTİRAK ETDİYİNİZ LAYİHƏLƏR'}}</small><h2>Layihələr üzrə Gedişat</h2></div>
+      <span class="badge-pill">{{reportProjects.length}} layihə</span>
+    </div>
+    <div v-if="reportProjects.length" class="project-charts-list">
+      <article v-for="(p, i) in reportProjects" :key="p.id" class="project-chart-item">
+        <div class="p-chart-head">
+          <div class="p-chart-title">
+            <i :class="'dot tone' + (i % 4)"></i>
+            <strong>{{p.name}}</strong>
+            <span v-if="p.late" class="late-badge" title="Gecikən tapşırıq">! {{p.late}} gecikən</span>
+          </div>
+          <div class="p-chart-meta">
+            <span>{{p.done}}/{{p.total}} icra</span>
+            <b class="p-pct">{{p.pct}}%</b>
+          </div>
+        </div>
+        <div class="p-multi-bar">
+          <div v-if="p.done" class="p-bar-seg s-done" :style="{ width: (p.done/p.total*100) + '%' }" :title="`Tamamlanıb: ${p.done}`"></div>
+          <div v-if="p.review" class="p-bar-seg s-review" :style="{ width: (p.review/p.total*100) + '%' }" :title="`Yoxlamada: ${p.review}`"></div>
+          <div v-if="p.doing" class="p-bar-seg s-doing" :style="{ width: (p.doing/p.total*100) + '%' }" :title="`İcradadır: ${p.doing}`"></div>
+          <div v-if="p.todo" class="p-bar-seg s-todo" :style="{ width: (p.todo/p.total*100) + '%' }" :title="`Planlaşdırılıb: ${p.todo}`"></div>
+        </div>
+      </article>
+    </div>
+    <p v-else class="emptyLane">Hələ layihə üzrə tapşırıq yoxdur.</p>
+  </section>
+
+  <section v-if="admin" class="panel chart-card">
+    <div class="chart-header">
+      <div><small>KOMANDA</small><h2>Əməkdaşların İş Yükü</h2></div>
+      <span class="badge-pill">{{reportUsers.length}} əməkdaş</span>
+    </div>
+    <div v-if="reportUsers.length" class="team-workload-list">
+      <article v-for="u in reportUsers" :key="u.id" class="team-workload-item">
+        <div class="tw-head">
+          <div class="tw-user">
+            <b class="avatar">{{initials(u.name)}}</b>
+            <div><strong>{{u.name}}</strong><small>{{roleName(u.role)}}</small></div>
+          </div>
+          <div class="tw-counts">
+            <span v-if="u.late" class="late-tag">{{u.late}} gecikən</span>
+            <span class="active-tag">{{u.total - u.done}} açıq</span>
+            <b class="done-tag">{{u.done}} bitib</b>
+          </div>
+        </div>
+        <div class="tw-bar-row">
+          <div class="h-bar-track">
+            <div class="h-bar-fill tone-green" :style="{ width: u.pct + '%' }" :title="`İcra: ${u.pct}%`"></div>
+          </div>
+          <span class="tw-pct">{{u.pct}}%</span>
+        </div>
+      </article>
+    </div>
+    <p v-else class="emptyLane">Aktiv əməkdaş tapılmadı.</p>
+  </section>
+
+  <section v-else class="panel chart-card personal-stats-card">
+    <div class="chart-header">
+      <div><small>FƏRDİ ANALİTİKA</small><h2>İcra və Keyfiyyət İndeksi</h2></div>
+      <span class="badge-pill tone-green">{{reportStats.onTimeRate}}% nizamlılıq</span>
+    </div>
+    <div class="personal-kpi-grid">
+      <div class="personal-kpi-box">
+        <span class="pkpi-title">Fəal Layihələr</span>
+        <b class="pkpi-num">{{reportProjects.length}}</b>
+        <small class="pkpi-desc">iştirak etdiyiniz layihə</small>
+      </div>
+      <div class="personal-kpi-box">
+        <span class="pkpi-title">İcra Səviyyəsi</span>
+        <b class="pkpi-num">{{reportStats.total ? Math.round((reportStats.done/reportStats.total)*100) : 0}}%</b>
+        <small class="pkpi-desc">{{reportStats.done}} / {{reportStats.total}} tamamlanıb</small>
+      </div>
+      <div class="personal-kpi-box">
+        <span class="pkpi-title">Açıq Tapşırıqlar</span>
+        <b class="pkpi-num">{{reportStats.todo + reportStats.doing + reportStats.review}}</b>
+        <small class="pkpi-desc">{{reportStats.doing}} icrada, {{reportStats.review}} yoxlamada</small>
+      </div>
+      <div class="personal-kpi-box" :class="{ 'alert-box': reportStats.late > 0 }">
+        <span class="pkpi-title">Gecikmə Sayı</span>
+        <b class="pkpi-num">{{reportStats.late}}</b>
+        <small class="pkpi-desc">{{reportStats.late ? 'təxirəsalınmaz icra tələb olunur' : 'bütün tarixlər vaxtındadır'}}</small>
+      </div>
+    </div>
+    <div class="personal-speed-gauge">
+      <div class="gauge-head">
+        <span>Vaxtında təhvil göstəricisi: <strong>{{reportStats.onTimeRate}}%</strong></span>
+        <small>{{reportStats.late ? reportStats.late + ' tapşırıq vaxtı keçib' : 'Bütün tapşırıqlar qrafikə uyğundur'}}</small>
+      </div>
+      <div class="h-bar-track">
+        <div class="h-bar-fill" :style="{ width: reportStats.onTimeRate + '%', background: reportStats.onTimeRate > 80 ? '#37583f' : (reportStats.onTimeRate > 50 ? '#ad8652' : '#8f5037') }"></div>
+      </div>
+    </div>
+  </section>
+</div>
+</template>
 <template v-if="page==='companies'||page==='plans'||page==='team'"><div class="metrics" v-if="isPlatform"><article v-for="m in platformMetrics"><span><ico :name="m[2]"></ico>{{m[0]}}</span><strong>{{m[1]}}</strong></article></div>
 <div class="panel scroll" v-if="page==='companies'"><table><thead><tr><th>Şirkət</th><th>Paket</th><th>İstifadə olunan yerlər</th><th>İdarəetmə</th></tr></thead><tbody><tr v-for="c in s.companies"><td><strong>{{c.name}}</strong></td><td>{{c.package}}</td><td>{{c.used}} / {{c.seats}}</td><td><button @click="open('company',c)">Redaktə</button> <button @click="go('team');companyFilter=c.id">Komanda</button></td></tr></tbody></table><p v-if="!s.companies.length" class="emptyLane">İlk şirkəti və onun administratorunu əlavə edin.</p></div>
 <div v-if="page==='plans'" class="planGrid"><article class="plan" v-for="p in s.plans"><ico name="box"></ico><h2>{{p.name}}</h2><strong>{{p.seats}}</strong><p>standart istifadəçi yeri</p><p>Aylıq qiymət · {{p.monthly.toLocaleString('az-AZ')}} ₼</p><hr><button @click="open('plan',p)">Paketi redaktə et →</button></article></div>

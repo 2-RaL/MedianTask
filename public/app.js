@@ -15,14 +15,118 @@ const app=createApp({
  data:()=>({s:null,ready:false,demo:false,busy:false,error:'',toast:'',timer:null,page:'board',mobile:false,auth:{email:'',password:''},view:'board',query:'',project:'',priority:'',companyFilter:'',modal:'',form:{},note:'',drag:null,over:'',statuses:{todo:'Planlaşdırılıb',doing:'İcradadır',review:'Yoxlamada',done:'Tamamlanıb'},priorities:{low:'Aşağı',normal:'Orta',high:'Yüksək'},demos:[['Şirkət admini','leyla'],['Platforma admini','platform'],['İstifadəçi','murad']]}),
  computed:{
   isPlatform(){return this.s?.me.role==='platform'},admin(){return this.s?.me.role==='admin'},
-  nav(){return this.isPlatform?[['companies','Şirkətlər','company'],['plans','Paketlər','box'],['team','İstifadəçilər','team']]:[['board','Tapşırıq lövhəsi','board'],['mine','Mənim tapşırıqlarım','check'],...(this.admin?[['reports','Hesabatlar','report'],['team','Komanda','team']]:[])]},
+  nav(){
+    if(this.isPlatform)return [['companies','Şirkətlər','company'],['plans','Paketlər','box'],['team','İstifadəçilər','team']];
+    return [
+      ['board','Tapşırıq lövhəsi','board'],
+      ['mine','Mənim tapşırıqlarım','check'],
+      ['reports','Hesabatlar','report'],
+      ...(this.admin?[['team','Komanda','team']]:[])
+    ];
+  },
   pageName(){return this.nav.find(n=>n[0]===this.page)?.[1]},
-  sub(){return {board:'Layihələr üzrə tapşırıqlar və onların icra vəziyyəti.',mine:'Sizə həvalə edilmiş tapşırıqlar və son tarixlər.',reports:'Layihələrin gedişatı və komandanın cari iş yükü.',companies:'Şirkətlərin paketləri, administratorları və istifadəçi yerləri.',plans:'Şirkətlər üçün standart paketlər və istifadəçi limitləri.',team:'Komanda üzvləri, rollar və giriş səlahiyyətləri.'}[this.page]},
+  sub(){
+    const reportsSub = this.admin
+      ? 'Layihələrin gedişatı və komandanın cari iş yükü.'
+      : 'Sizə həvalə edilmiş tapşırıqların gedişatı və fərdi icra analitikası.';
+    return {
+      board:'Layihələr üzrə tapşırıqlar və onların icra vəziyyəti.',
+      mine:'Sizə həvalə edilmiş tapşırıqlar və son tarixlər.',
+      reports:reportsSub,
+      companies:'Şirkətlərin paketləri, administratorları və istifadəçi yerləri.',
+      plans:'Şirkətlər üçün standart paketlər və istifadəçi limitləri.',
+      team:'Komanda üzvləri, rollar və giriş səlahiyyətləri.'
+    }[this.page];
+  },
   today(){return new Date().toLocaleDateString('az-AZ',{weekday:'long',day:'numeric',month:'long'})},
   team(){return this.s.users.filter(u=>!this.isPlatform||!this.companyFilter||u.company===this.companyFilter)},
   filtered(){return this.baseTasks.filter(t=>(!this.project||t.project===this.project)&&(!this.priority||t.priority===this.priority)&&(!this.query||t.title.toLocaleLowerCase('az').includes(this.query.trim().toLocaleLowerCase('az'))))},
   baseTasks(){return this.s.tasks.filter(t=>this.page!=='mine'||t.owner===this.s.me.id)},
-  boardMetrics(){const t=this.page==='reports'?this.baseTasks:this.filtered;return [['Cəmi tapşırıq',t.length,'board'],['İcradadır',t.filter(x=>x.status==='doing').length,'clock'],['Tamamlanıb',t.filter(x=>x.status==='done').length,'check'],['Gecikən',t.filter(this.late).length,'flag']]},
+  reportTasks(){
+    if(!this.s?.tasks)return [];
+    return this.admin ? this.s.tasks : this.s.tasks.filter(t=>t.owner===this.s.me.id);
+  },
+  boardMetrics(){
+    const t=this.page==='reports'?this.reportTasks:(this.page==='mine'?this.baseTasks:this.filtered);
+    const total=t.length,done=t.filter(x=>x.status==='done').length,rate=total?Math.round((done/total)*100):0,late=t.filter(this.late).length;
+    return [
+      ['Cəmi tapşırıq',total,'board',total+' tapşırıq'],
+      ['İcradadır',t.filter(x=>x.status==='doing').length,'clock','aktiv icra prosesində'],
+      ['Tamamlanıb',`${done} (${rate}%)`,'check','uğurla icra edilib'],
+      ['Gecikən',late,'flag',late?'diqqət tələb edir':'qrafikə uyğundur']
+    ];
+  },
+  reportStats(){
+    const t=this.reportTasks,total=t.length;
+    const todo=t.filter(x=>x.status==='todo').length;
+    const doing=t.filter(x=>x.status==='doing').length;
+    const review=t.filter(x=>x.status==='review').length;
+    const done=t.filter(x=>x.status==='done').length;
+    const late=t.filter(this.late).length;
+
+    const high=t.filter(x=>x.priority==='high').length;
+    const normal=t.filter(x=>x.priority==='normal').length;
+    const low=t.filter(x=>x.priority==='low').length;
+
+    const maxStatus=Math.max(todo,doing,review,done,1);
+    const maxPriority=Math.max(high,normal,low,1);
+
+    const statuses=[
+      {key:'todo',label:'Planlaşdırılıb',count:todo,pct:total?Math.round((todo/total)*100):0,barPct:Math.round((todo/maxStatus)*100),color:'#8f9b91'},
+      {key:'doing',label:'İcradadır',count:doing,pct:total?Math.round((doing/total)*100):0,barPct:Math.round((doing/maxStatus)*100),color:'#ad8652'},
+      {key:'review',label:'Yoxlamada',count:review,pct:total?Math.round((review/total)*100):0,barPct:Math.round((review/maxStatus)*100),color:'#79909e'},
+      {key:'done',label:'Tamamlanıb',count:done,pct:total?Math.round((done/total)*100):0,barPct:Math.round((done/maxStatus)*100),color:'#37583f'},
+    ];
+
+    const priorities=[
+      {key:'high',label:'Yüksək',count:high,pct:total?Math.round((high/total)*100):0,barPct:Math.round((high/maxPriority)*100),color:'#8f5037',bg:'#f3e4dc'},
+      {key:'normal',label:'Orta',count:normal,pct:total?Math.round((normal/total)*100):0,barPct:Math.round((normal/maxPriority)*100),color:'#806329',bg:'#f1ead7'},
+      {key:'low',label:'Aşağı',count:low,pct:total?Math.round((low/total)*100):0,barPct:Math.round((low/maxPriority)*100),color:'#45685a',bg:'#e5eee6'},
+    ];
+
+    const C=251.327;let offset=0;
+    const donutSegments=priorities.map(p=>{
+      const strokeDash=total?(p.count/total)*C:0;
+      const currentOffset=offset;
+      offset+=strokeDash;
+      return {...p,dasharray:`${strokeDash} ${C-strokeDash}`,dashoffset:-currentOffset};
+    });
+
+    const onTimeRate=total?Math.round(((total-late)/total)*100):100;
+    return {total,todo,doing,review,done,late,high,normal,low,statuses,priorities,donutSegments,onTimeRate};
+  },
+  reportProjects(){
+    if(!this.s?.projects)return [];
+    const t=this.reportTasks;
+    const list=this.admin?this.s.projects:this.s.projects.filter(p=>t.some(task=>task.project===p.id));
+    return list.map(p=>{
+      const pTasks=t.filter(task=>task.project===p.id);
+      const total=pTasks.length;
+      const done=pTasks.filter(task=>task.status==='done').length;
+      const doing=pTasks.filter(task=>task.status==='doing').length;
+      const review=pTasks.filter(task=>task.status==='review').length;
+      const todo=pTasks.filter(task=>task.status==='todo').length;
+      const late=pTasks.filter(this.late).length;
+      const pct=total?Math.round((done/total)*100):0;
+      return {id:p.id,name:p.name,total,done,doing,review,todo,late,pct};
+    });
+  },
+  reportUsers(){
+    if(!this.admin||!this.s?.users)return [];
+    const activeTasks=this.s.tasks;
+    const maxUserTasks=Math.max(...this.s.users.map(u=>activeTasks.filter(t=>t.owner===u.id).length),1);
+    return this.s.users
+      .filter(u=>u.active||activeTasks.some(t=>t.owner===u.id&&t.status!=='done'))
+      .map(u=>{
+        const uTasks=activeTasks.filter(t=>t.owner===u.id);
+        const total=uTasks.length;
+        const done=uTasks.filter(t=>t.status==='done').length;
+        const doing=uTasks.filter(t=>t.status==='doing').length;
+        const late=uTasks.filter(this.late).length;
+        const pct=total?Math.round((done/total)*100):0;
+        return {id:u.id,name:u.name,role:u.role,total,done,doing,late,pct,barPct:Math.round((total/maxUserTasks)*100)};
+      });
+  },
   platformMetrics(){return [['Şirkətlər',this.s.companies.length,'company'],['Aktiv hesablar',this.s.users.filter(u=>u.active).length,'team'],['Paketlər',this.s.plans.length,'box'],['Boş yerlər',this.s.companies.reduce((n,c)=>n+c.seats-c.used,0),'grid']]},
   current(){return this.s?.tasks?.find(t=>t.id===this.form.id)},
   actionLabel(){if(this.page==='reports')return 'CSV yüklə';if(!this.admin&&!this.isPlatform)return '';return {board:'Yeni tapşırıq',mine:'Yeni tapşırıq',team:'İstifadəçi əlavə et',companies:'Şirkət əlavə et',plans:'Yeni paket'}[this.page]},
@@ -107,7 +211,7 @@ const app=createApp({
   },
   move(t,status){if(t.status!==status)this.mutate('status',{id:t.id,version:t.version,status})},
   drop(k){if(this.drag)this.move(this.drag,k);this.drag=null;this.over=''},
-  csv(){const rows=[['Tapşırıq','Layihə','Məsul şəxs','Mərhələ','Prioritet','Son tarix'],...this.s.tasks.map(t=>[t.title,this.projectName(t.project),this.person(t.owner),this.statuses[t.status],this.priorities[t.priority],t.due])];const quote=v=>'"'+String(v||'').replace(/^[\s]*[=+@-]/,m=>"'"+m).replaceAll('"','""')+'"';const url=URL.createObjectURL(new Blob(['\uFEFF'+rows.map(r=>r.map(quote).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download='Meridian-Hesabat.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}
+  csv(){const tasks=this.reportTasks;const rows=[['Tapşırıq','Layihə','Məsul şəxs','Mərhələ','Prioritet','Son tarix'],...tasks.map(t=>[t.title,this.projectName(t.project),this.person(t.owner),this.statuses[t.status],this.priorities[t.priority],t.due])];const quote=v=>'"'+String(v||'').replace(/^[\s]*[=+@-]/,m=>"'"+m).replaceAll('"','""')+'"';const url=URL.createObjectURL(new Blob(['\uFEFF'+rows.map(r=>r.map(quote).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download=(this.admin?'Meridian-Umumi-Hesabat.csv':'Meridian-Ferdi-Hesabat.csv');a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}
  }
 });
 app.component('ico',{props:['name'],setup(){return {icons}},template:'<svg class="ico" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path :d="icons[name]"/></svg>'});
