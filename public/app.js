@@ -1,7 +1,7 @@
 const { createApp } = Vue;
 const icons={grid:'M3 3h7v7H3z M14 3h7v7h-7z M3 14h7v7H3z M14 14h7v7h-7z',board:'M3 4h18v16H3z M9 4v16 M15 4v16',list:'M7 6h14 M7 12h14 M7 18h14 M3 6h.1 M3 12h.1 M3 18h.1',box:'m12 2 9 5v10l-9 5-9-5V7z M3 7l9 5 9-5 M12 12v10',team:'M3 20v-2a5 5 0 0 1 10 0v2 M16 14a5 5 0 0 1 5 5 M12 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0 M16 4a4 4 0 0 1 0 8',report:'M3 3v18h18 M8 16v-5 M13 16V6 M18 16v-8',check:'m4 12 5 5L20 6',clock:'M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0 M12 6v6l4 2',search:'M17 10a7 7 0 1 1-14 0 7 7 0 0 1 14 0 M15 15l6 6',date:'M3 5h18v16H3z M7 2v6 M17 2v6 M3 10h18',plus:'M12 5v14 M5 12h14',logout:'M10 3H4v18h6 M9 12h12 M17 8l4 4-4 4',menu:'M3 5h18 M3 12h18 M3 19h18',flag:'M5 21V3c5-4 9 5 15 0v10c-6 5-10-4-15 0',company:'M4 21V3h12v18 M16 10h4v11 M2 21h20 M8 7h4 M8 11h4 M8 15h4'};
 const app=createApp({
- data:()=>({s:null,ready:false,demo:false,busy:false,error:'',toast:'',timer:null,page:'board',mobile:false,auth:{email:'',password:''},view:'board',query:'',project:'',priority:'',companyFilter:'',modal:'',form:{},note:'',drag:null,over:'',statuses:{todo:'Planlaşdırılıb',doing:'İcradadır',review:'Yoxlamada',done:'Tamamlanıb'},priorities:{low:'Aşağı',normal:'Orta',high:'Yüksək'},demos:[['Şirkət admini','leyla'],['Platforma admini','platform'],['İstifadəçi','murad']]}),
+ data:()=>({s:null,ready:false,demoPage:location.pathname==='/demo',busy:false,error:'',toast:'',timer:null,page:'board',mobile:false,auth:{email:'',password:''},view:'board',query:'',project:'',priority:'',companyFilter:'',modal:'',form:{},note:'',drag:null,over:'',statuses:{todo:'Planlaşdırılıb',doing:'İcradadır',review:'Yoxlamada',done:'Tamamlanıb'},priorities:{low:'Aşağı',normal:'Orta',high:'Yüksək'},demos:[['Super admin','platform'],['Admin','admin'],['İstifadəçi','member']]}),
  computed:{
   isPlatform(){return this.s?.me.role==='platform'},admin(){return this.s?.me.role==='admin'},
   nav(){return this.isPlatform?[['companies','Şirkətlər','company'],['plans','Paketlər','box'],['team','İstifadəçilər','team']]:[['board','Tapşırıq lövhəsi','board'],['mine','Mənim tapşırıqlarım','check'],...(this.admin?[['reports','Hesabatlar','report'],['team','Komanda','team']]:[])]},
@@ -17,18 +17,26 @@ const app=createApp({
   actionLabel(){if(this.page==='reports')return 'CSV yüklə';if(!this.admin&&!this.isPlatform)return '';return {board:'Yeni tapşırıq',mine:'Yeni tapşırıq',team:'İstifadəçi əlavə et',companies:'Şirkət əlavə et',plans:'Yeni paket'}[this.page]},
   modalTitle(){return this.modal==='detail'?this.current?.title:this.modal==='deleteTask'?'Tapşırıq silinsin?':({task:'Tapşırıq',plan:'Paket',company:'Şirkət',user:'İstifadəçi',project:'Layihə'}[this.modal]||'')+(this.form.id?' · redaktə':' · əlavə et')}
  },
- async mounted(){try{this.demo=(await this.api('info')).demo;await this.restore()}catch(e){if(e.status!==401)this.error=e.message}finally{this.ready=true}},
+ async mounted(){try{await this.restore()}catch(e){if(e.status!==401)this.error=e.message}finally{this.ready=true}},
  methods:{
-  async api(path,body){const r=await fetch('/api/'+path,body===undefined?{}:{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const d=await r.json();if(!r.ok){if(r.status===401&&this.s){this.close();this.s=null}throw Object.assign(Error(d.error),{status:r.status})}return d},
+  async api(path,body,demo=this.demoPage){const r=await fetch((demo?'/api/demo/':'/api/')+path,body===undefined?{}:{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const d=await r.json();if(!r.ok){if(r.status===401&&this.s){this.close();this.s=null}throw Object.assign(Error(d.error),{status:r.status})}return d},
   async restore(){this.s=await this.api('state');this.go(this.isPlatform?'companies':'board')},
   async login(){this.busy=true;this.error='';try{await this.api('login',this.auth);await this.restore();this.auth.password=''}catch(e){this.error=e.message}finally{this.busy=false}},
-  async demoLogin(name){
-    if(!this.demo || this.busy)return;
-    this.auth={email:name+'@meridian.test',password:'MeridianDemo2026'};
-    await this.$nextTick();
-    await this.login();
+  async demoLogin(role){
+    if(this.busy)return;
+    this.busy=true;
+    this.error='';
+    try{
+      await this.api('login',{role},true);
+      if(this.demoPage)await this.restore();
+      else location.assign('/demo');
+    }catch(e){
+      this.error=e.message;
+    }finally{
+      this.busy=false;
+    }
   },
-  async logout(){try{await this.api('logout',{});this.s=null;this.auth={email:'',password:''};this.error='';this.mobile=false}catch(e){this.notify(e.message)}},
+  async logout(){try{await this.api('logout',{});if(this.demoPage){location.assign('/');return}this.s=null;this.auth={email:'',password:''};this.error='';this.mobile=false}catch(e){this.notify(e.message)}},
   go(page){this.page=page;this.project='';this.priority='';this.query='';this.companyFilter='';this.mobile=false},
   roleName(r){return {platform:'Platforma administratoru',admin:'Şirkət administratoru',member:'Əməkdaş'}[r]},
   initials(n){return n.split(/\s+/).slice(0,2).map(s=>s[0]).join('').toLocaleUpperCase('az')},person(id){return this.s.users.find(u=>u.id===id)?.name||'Təyin edilməyib'},

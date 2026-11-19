@@ -46,6 +46,34 @@ test('Build, birbaşa və require ilə işəsalma, HTTPS proxy və redeploy sonr
   let url=await start(join(root,'release-one'), { adminEmailKey: 'ADMIIN_EMAIL' });
   assert.equal((await fetch(url+'/api/health')).status,200);
   assert.equal((await fetch(url+'/')).status,200);
+  assert.equal((await fetch(url+'/demo')).status,200);
+  const demoHeaders = {'Content-Type':'application/json', Origin:appOrigin};
+  assert.equal((await fetch(url+'/api/demo/state')).status,401);
+  for (const role of ['platform', 'admin', 'member']) {
+    const response = await fetch(url+'/api/demo/login', {
+      method:'POST', headers:demoHeaders, body:JSON.stringify({role}),
+    });
+    assert.equal(response.status,200);
+    const setCookie = response.headers.get('set-cookie');
+    assert.match(setCookie,/^demo_sid=[a-f\d]+; Path=\/api\/demo\/; HttpOnly; SameSite=Lax; Secure/);
+    const demoCookie = setCookie.split(';')[0];
+    const demoState = await fetch(url+'/api/demo/state',{headers:{Cookie:demoCookie}});
+    assert.equal(demoState.status,200);
+    assert.equal((await demoState.json()).me.role,role);
+    const liveState = await fetch(url+'/api/state',{
+      headers:{Cookie:demoCookie.replace('demo_sid=','sid=')},
+    });
+    assert.equal(liveState.status,401);
+    const change = await fetch(url+'/api/demo/plan',{
+      method:'POST', headers:{...demoHeaders,Cookie:demoCookie}, body:'{}',
+    });
+    assert.equal(change.status,403);
+    const logout = await fetch(url+'/api/demo/logout',{
+      method:'POST', headers:{...demoHeaders,Cookie:demoCookie}, body:'{}',
+    });
+    assert.equal(logout.status,200);
+    assert.equal((await fetch(url+'/api/demo/state',{headers:{Cookie:demoCookie}})).status,401);
+  }
   async function login(){
     const r=await fetch(url+'/api/login',{method:'POST',headers:{'Content-Type':'application/json',Origin:appOrigin},body:JSON.stringify({email:'owner@example.com',password:pass})});
     assert.equal(r.status,200);
@@ -53,6 +81,10 @@ test('Build, birbaşa və require ilə işəsalma, HTTPS proxy və redeploy sonr
     return r.headers.get('set-cookie').split(';')[0];
   }
   let cookie=await login();
+  const isolatedDemo = await fetch(url+'/api/demo/state',{
+    headers:{Cookie:cookie.replace('sid=','demo_sid=')},
+  });
+  assert.equal(isolatedDemo.status,401);
   const r=await fetch(url+'/api/plan',{method:'POST',headers:{'Content-Type':'application/json',Origin:appOrigin,Cookie:cookie},body:JSON.stringify({name:'Persistent plan',seats:25,monthly:29})});
   assert.equal(r.status,200);
   await stop();
