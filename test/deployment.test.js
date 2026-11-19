@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 
-test('Build, birbaşa entry, HTTPS proxy və redeploy sonrası məlumat', async t => {
+test('Build, birbaşa və require ilə işəsalma, HTTPS proxy və redeploy sonrası məlumat', async t => {
   const root = await mkdtemp(join(tmpdir(), 'meridian-deploy-'));
   t.after(() => rm(root, {recursive:true,force:true}));
   const source = fileURLToPath(new URL('../', import.meta.url));
@@ -17,7 +17,7 @@ test('Build, birbaşa entry, HTTPS proxy və redeploy sonrası məlumat', async 
   const data = join(root,'persistent');
   const appOrigin='https://meridian.example';
   const pass='DeploymentCheck2026';
-  async function start(folder) {
+  async function start(folder, loadWithRequire = false) {
     await cp(join(source,'dist'), folder, {recursive:true});
     await writeFile(join(folder,'.env'), [
       'NODE_ENV=production',
@@ -28,7 +28,11 @@ test('Build, birbaşa entry, HTTPS proxy və redeploy sonrası məlumat', async 
       'ADMIN_PASSWORD='+pass,
     ].join('\n'));
     // PORT=0 seçimini testdəki serverin elan etdiyi porta bağlamaq üçün logu genişləndiririk.
-    child=spawn(process.execPath,[join(folder,'index.js')],{cwd:root,stdio:['ignore','pipe','pipe']});
+    const entry = join(folder, 'index.js');
+    const args = loadWithRequire
+      ? ['--input-type=commonjs', '--eval', 'require(process.argv[1])', entry]
+      : [entry];
+    child=spawn(process.execPath,args,{cwd:root,stdio:['ignore','pipe','pipe']});
     let output='';
     const port = await new Promise((resolve,reject)=>{
       child.stdout.on('data',chunk=>{output+=chunk;const m=output.match(/localhost:(\d+)/);if(m)resolve(Number(m[1]));});
@@ -52,7 +56,8 @@ test('Build, birbaşa entry, HTTPS proxy və redeploy sonrası məlumat', async 
   const r=await fetch(url+'/api/plan',{method:'POST',headers:{'Content-Type':'application/json',Origin:appOrigin,Cookie:cookie},body:JSON.stringify({name:'Persistent plan',seats:25,monthly:29})});
   assert.equal(r.status,200);
   await stop();
-  url=await start(join(root,'release-two'));
+  url=await start(join(root,'release-two'), true);
+  assert.equal((await fetch(url+'/api/health')).status,200);
   cookie=await login();
   const state=await (await fetch(url+'/api/state',{headers:{Cookie:cookie}})).json();
   assert.ok(state.plans.some(p=>p.name==='Persistent plan'));
