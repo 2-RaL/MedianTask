@@ -10,7 +10,6 @@ const presentationAccounts = new Map();
 const app=createApp({
  setup(){
   return {
-    presentation: location.hash === '#teqdimat',
     presentationRoles,
     preparedRoles: Vue.ref([]),
   };
@@ -32,7 +31,7 @@ const app=createApp({
   modalTitle(){if(this.modal==='importUsers')return 'Excel ilə toplu əlavə et';return this.modal==='detail'?this.current?.title:this.modal==='deleteTask'?'Tapşırıq silinsin?':({task:'Tapşırıq',plan:'Paket',company:'Şirkət',user:'İstifadəçi',project:'Layihə'}[this.modal]||'')+(this.form.id?' · redaktə':' · əlavə et')}
  },
  async mounted(){
-  if(this.presentation)window.addEventListener('pagehide',this.clearPresentation);
+  window.addEventListener('pagehide',this.clearPresentation);
   try{this.demo=(await this.api('info')).demo;await this.restore()}catch(e){if(e.status!==401)this.error=e.message}finally{this.ready=true}
  },
  beforeUnmount(){window.removeEventListener('pagehide',this.clearPresentation);this.clearPresentation()},
@@ -48,8 +47,14 @@ const app=createApp({
     if(this.preparedRoles.length===presentationRoles.length)form.closest('details').open=false;
   },
   fillPresentation(role){
+    if(this.busy)return;
     const account=presentationAccounts.get(role);
-    if(!account||this.busy)return;
+    if(!account){
+      const setup=this.$refs.presentationSetup;
+      setup.open=true;
+      setup.querySelector(`[data-presentation-role="${role}"] input[name="email"]`)?.focus();
+      return;
+    }
     this.auth={...account};
     this.error='';
     this.$nextTick(()=>this.$refs.loginSubmit?.focus());

@@ -87,15 +87,15 @@
 </svg>
 <div class="covertext"><small>KOMANDA ÜÇÜN İŞ MƏKANI</small><h1>Layihələriniz bir yerdə.</h1></div></section>
 <section class="loginform"><small>MERIDIAN WORKSPACE</small><h1>Hesabınıza daxil olun</h1><p>İş məkanınıza şirkət hesabınızla keçin.</p><form @submit.prevent="login"><label>E-poçt<input type="email" autocomplete="username" v-model="auth.email" required></label><label>Şifrə<input type="password" autocomplete="current-password" v-model="auth.password" required></label><p class="error" role="alert" v-if="error">{{error}}</p><button ref="loginSubmit" class="primary wide" :disabled="busy">Daxil ol <span>→</span></button></form>
-<div v-if="presentation" class="demobox presentation-access">
+<div class="demobox presentation-access">
   <small>TƏQDİMAT ÜÇÜN SÜRƏTLİ GİRİŞ</small>
   <div>
-    <button v-for="role in presentationRoles" :key="role.id" type="button" :disabled="busy || !preparedRoles.includes(role.id)" @click="fillPresentation(role.id)">{{role.label}}</button>
+    <button v-for="role in presentationRoles" :key="role.id" type="button" :disabled="busy" @click="fillPresentation(role.id)">{{role.label}}</button>
   </div>
-  <details>
+  <details ref="presentationSetup">
     <summary>Hesabları bu tab üçün hazırla</summary>
     <p>Məlumatları bir dəfə daxil edin. Səhifə yenilənəndə və ya bağlananda onlar silinir.</p>
-    <form v-for="role in presentationRoles" :key="role.id" autocomplete="off" @submit.prevent="preparePresentation(role.id,$event.currentTarget)">
+    <form v-for="role in presentationRoles" :key="role.id" :data-presentation-role="role.id" autocomplete="off" @submit.prevent="preparePresentation(role.id,$event.currentTarget)">
       <fieldset>
         <legend>{{role.label}}</legend>
         <label>E-poçt<input name="email" type="email" autocomplete="off" required></label>
