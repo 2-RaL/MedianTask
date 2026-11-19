@@ -12,7 +12,7 @@ test('Şirkətlər, limitlər, səlahiyyətlər və tapşırıqlar',async t=>{
   const dir=await mkdtemp(join(tmpdir(),'meridian-test-'));
   const probe=createServer();probe.listen(0,'127.0.0.1');await once(probe,'listening');const port=probe.address().port;await new Promise(r=>probe.close(r));
   const password='LocalTestPass2026';
-  const server=spawn(process.execPath,[fileURLToPath(new URL('../index.js',import.meta.url))],{env:{...process.env,DATA_DIR:dir,PORT:String(port),HOST:'127.0.0.1',ADMIN_EMAIL:'root@test.local',ADMIN_PASSWORD:password},stdio:['ignore','pipe','inherit']});
+  const server=spawn(process.execPath,[fileURLToPath(new URL('../index.js',import.meta.url))],{env:{...process.env,NODE_ENV:'production',DATA_DIR:dir,PORT:String(port),HOST:'127.0.0.1',ADMIN_EMAIL:'root@test.local',ADMIN_PASSWORD:password},stdio:['ignore','pipe','inherit']});
   t.after(async()=>{if(server.exitCode===null){const ended=once(server,'exit');server.kill();await ended}await rm(dir,{recursive:true,force:true})});
   await Promise.race([once(server.stdout,'data'),once(server,'exit').then(()=>{throw Error('Server dayandı')})]);
   const req=async(path,cookie='',body)=>fetch('http://127.0.0.1:'+port+'/api/'+path,{method:body?'POST':'GET',headers:{cookie,'content-type':'application/json'},body:body?JSON.stringify(body):undefined});
