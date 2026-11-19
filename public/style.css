@@ -23,12 +23,13 @@
   margin: 40px auto;
 }
 
+.login-brand .logo-wordmark,
 .login-brand .logo-letter {
-  fill: #0b2818;
-  stroke: #faf2da;
-  stroke-width: 2.5;
-  stroke-linejoin: round;
-  paint-order: stroke fill;
+  fill: #f4e9d0;
+}
+
+.login-brand .logo-wordmark {
+  font: 400 184px var(--serif);
 }
 
 @media (max-width: 680px) {
