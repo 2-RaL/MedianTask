@@ -142,7 +142,7 @@ const server = http.createServer(async(req,res)=>{
     if(!path.startsWith('/api/')){
       const file=resolve(web,'.'+decodeURIComponent(path==='/'?'/index.html':path));
       if(!file.startsWith(web+sep)||!existsSync(file))fail('Tapılmadı.',404);
-      res.setHeader('Content-Type',({'.js':'text/javascript','.css':'text/css','.html':'text/html','.ttf':'font/ttf'})[extname(file)]||'application/octet-stream');return res.end(readFileSync(file));
+      res.setHeader('Content-Type',({'.js':'text/javascript','.css':'text/css','.html':'text/html','.ttf':'font/ttf','.png':'image/png'})[extname(file)]||'application/octet-stream');return res.end(readFileSync(file));
     }
     if(path==='/api/health' && req.method==='GET') {
       one('SELECT 1 AS ready');
