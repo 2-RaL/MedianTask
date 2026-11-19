@@ -15,7 +15,7 @@ const app=createApp({
   platformMetrics(){return [['Şirkətlər',this.s.companies.length,'company'],['Aktiv hesablar',this.s.users.filter(u=>u.active).length,'team'],['Paketlər',this.s.plans.length,'box'],['Boş yerlər',this.s.companies.reduce((n,c)=>n+c.seats-c.used,0),'grid']]},
   current(){return this.s?.tasks?.find(t=>t.id===this.form.id)},
   actionLabel(){if(this.page==='reports')return 'CSV yüklə';if(!this.admin&&!this.isPlatform)return '';return {board:'Yeni tapşırıq',mine:'Yeni tapşırıq',team:'İstifadəçi əlavə et',companies:'Şirkət əlavə et',plans:'Yeni paket'}[this.page]},
-  modalTitle(){return this.modal==='detail'?this.current?.title:this.modal==='deleteTask'?'Tapşırıq silinsin?':({task:'Tapşırıq',plan:'Paket',company:'Şirkət',user:'İstifadəçi',project:'Layihə'}[this.modal]||'')+(this.form.id?' · redaktə':' · əlavə et')}
+  modalTitle(){if(this.modal==='importUsers')return 'Excel ilə toplu əlavə et';return this.modal==='detail'?this.current?.title:this.modal==='deleteTask'?'Tapşırıq silinsin?':({task:'Tapşırıq',plan:'Paket',company:'Şirkət',user:'İstifadəçi',project:'Layihə'}[this.modal]||'')+(this.form.id?' · redaktə':' · əlavə et')}
  },
  async mounted(){try{this.demo=(await this.api('info')).demo;await this.restore()}catch(e){if(e.status!==401)this.error=e.message}finally{this.ready=true}},
  methods:{
@@ -43,6 +43,48 @@ const app=createApp({
   close(){this.$refs.dialog?.close();this.modal='';this.error=''},detail(t){this.open('detail',t)},
   async mutate(type,payload,after){if(this.busy)return;this.busy=true;this.error='';try{await this.api(type,payload);this.s=await this.api('state');after?.();this.notify('Dəyişiklik yadda saxlanıldı.')}catch(e){this.error=e.message;if(!this.modal)this.notify(e.message);if(e.status===409){try{this.s=await this.api('state')}catch{}}}finally{this.busy=false}},
   save(){this.mutate(this.modal,this.form,()=>this.close())},comment(){this.mutate('comment',{id:this.form.id,body:this.note},()=>this.note='')},
+  async importUsers(){
+    if(this.busy)return;
+    const file=this.$refs.importFile.files[0];
+    if(!file||!file.name.toLowerCase().endsWith('.xlsx')||file.size>2*1024*1024){
+      this.error='2 MB-dan böyük olmayan .xlsx faylı seçin.';
+      return;
+    }
+    const company=this.form.company;
+    this.error='';
+    this.busy=true;
+    try {
+      let sheets;
+      try {
+        sheets=await readXlsxFile(file,{trim:false});
+      } catch {
+        throw Error('Excel faylı oxunmadı. Faylı .xlsx kimi yenidən yadda saxlayın.');
+      }
+      const [header=[],...lines]=sheets[0]?.data??[];
+      const titles=header.map(value=>String(value??'').trim().toLocaleLowerCase('az'));
+      const columns=['ad və soyad','e-poçt','şifrə'].map(name=>titles.indexOf(name));
+      if(columns.includes(-1))throw Error('İlk sətirdə Ad və soyad, E-poçt və Şifrə başlıqları olmalıdır.');
+      const roleColumn=titles.indexOf('rol');
+      const rows=[];
+      for(const [index,line] of lines.entries()){
+        const [name,email,password]=columns.map(column=>line[column]);
+        const role=String(line[roleColumn]??'').trim().toLowerCase();
+        if([name,email,password,role].every(value=>value==null||value===''))continue;
+        rows.push({line:index+2,name,email,password,role:role||'member'});
+        if(rows.length>25)throw Error('Bir faylda ən çox 25 istifadəçi ola bilər.');
+      }
+      if(!rows.length)throw Error('Əlavə ediləcək istifadəçi tapılmadı.');
+      const {imported}=await this.api('importUsers',{company,rows});
+      this.close();
+      this.notify(`${imported} istifadəçi əlavə edildi.`);
+      this.s=await this.api('state');
+    } catch(error) {
+      if(this.modal==='importUsers')this.error=error.message;
+      else this.notify(error.message);
+    } finally {
+      this.busy=false;
+    }
+  },
   move(t,status){if(t.status!==status)this.mutate('status',{id:t.id,version:t.version,status})},
   drop(k){if(this.drag)this.move(this.drag,k);this.drag=null;this.over=''},
   csv(){const rows=[['Tapşırıq','Layihə','Məsul şəxs','Mərhələ','Prioritet','Son tarix'],...this.s.tasks.map(t=>[t.title,this.projectName(t.project),this.person(t.owner),this.statuses[t.status],this.priorities[t.priority],t.due])];const quote=v=>'"'+String(v||'').replace(/^[\s]*[=+@-]/,m=>"'"+m).replaceAll('"','""')+'"';const url=URL.createObjectURL(new Blob(['\uFEFF'+rows.map(r=>r.map(quote).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download='Meridian-Hesabat.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}

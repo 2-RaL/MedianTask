@@ -41,6 +41,32 @@ function password(v){if(typeof v!=='string'||v.length<12||v.length>128)fail('Şi
 function hash(v){const salt=randomBytes(16).toString('hex');return salt+':'+scryptSync(password(v),salt,64).toString('hex');}
 function user(name,mail,pass,role,company){return insert('INSERT INTO users(name,email,hash,role,company) VALUES(?,?,?,?,?)',str(name),email(mail),hash(pass),role,company);}
 function choose(v,items){if(!items.includes(v))fail('Seçim yanlışdır.');return v;}
+function importUsers(b,u){
+  if(u.role!=='platform')staff(u);
+  const target=company(u.role==='platform'?Number(b.company):u.company);
+  if(!Array.isArray(b.rows)||b.rows.length<1||b.rows.length>25)fail('Bir faylda 1–25 istifadəçi olmalıdır.');
+  if(target.used+b.rows.length>target.seats)fail('Şirkətdə bu idxal üçün kifayət qədər boş yer yoxdur.',409);
+
+  const seen=new Set();
+  const accounts=b.rows.map((row,index)=>{
+    const line=Number.isSafeInteger(row?.line)&&row.line>=2&&row.line<=1048576?row.line:index+2;
+    try {
+      if(!row||typeof row!=='object')fail('İstifadəçi məlumatları yanlışdır.');
+      const name=str(row.name);
+      const mail=email(row.email);
+      const pass=password(row.password);
+      const role=choose(row.role??'member',['admin','member']);
+      if(seen.has(mail)||one('SELECT id FROM users WHERE email=?',mail))fail('Bu e-poçt ünvanı artıq istifadə olunur.',409);
+      seen.add(mail);
+      return {name,mail,pass,role};
+    } catch(error) {
+      if(!error.status)throw error;
+      fail(`Excel sətiri ${line}. ${error.message}`,error.status);
+    }
+  });
+  for(const account of accounts)user(account.name,account.mail,account.pass,account.role,target.id);
+  return accounts.length;
+}
 const statuses=['todo','doing','review','done'], priorities=['low','normal','high'];
 if(!one('SELECT id FROM users LIMIT 1'))tx(()=>{
   // Accept the legacy spelling used by the initial Hostinger deployment.
@@ -154,7 +180,8 @@ const server = http.createServer(async(req,res)=>{
     if(req.method==='POST'){
       if(req.headers.origin && (appOrigin ? req.headers.origin !== appOrigin : new URL(req.headers.origin).host !== req.headers.host))fail('Mənbə qəbul edilmir.',403);
       if(!req.headers['content-type']?.startsWith('application/json'))fail('JSON tələb olunur.',415);
-      const chunks=[];let size=0;for await(const chunk of req){size+=chunk.length;if(size>32768)fail('Sorğu çox böyükdür.',413);chunks.push(chunk);}
+      const bodyLimit=path==='/api/importUsers'?131072:32768;
+      const chunks=[];let size=0;for await(const chunk of req){size+=chunk.length;if(size>bodyLimit)fail('Sorğu çox böyükdür.',413);chunks.push(chunk);}
       try{b=JSON.parse(Buffer.concat(chunks));if(!b||typeof b!=='object'||Array.isArray(b))throw Error();}catch{fail('Sorğu formatı yanlışdır.');}
     }
     const cookie='; Path=/; HttpOnly; SameSite=Lax'+(!demo&&(process.env.COOKIE_SECURE==='true'||production)?'; Secure':'');
@@ -176,6 +203,7 @@ const server = http.createServer(async(req,res)=>{
     if(!u)fail('Hesabınıza daxil olun.',401);
     if(path==='/api/state'&&req.method==='GET')return json(200,state(u));
     if(req.method!=='POST')fail('Üsul qəbul edilmir.',405);
+    if(path==='/api/importUsers')return json(200,{imported:tx(()=>importUsers(b,u))});
     if(path==='/api/logout'){run('DELETE FROM sessions WHERE token=?',token);res.setHeader('Set-Cookie','sid='+cookie+'; Max-Age=0');return json(200,{ok:true});}
     tx(()=>change(path.slice(5),b,u));return json(200,{ok:true});
   }catch(e){const unique=e.message.includes('UNIQUE constraint');if(!e.status&&!unique)console.error(e.message);json(e.status||(unique?409:500),{error:unique?'Bu e-poçt və ya paket adı artıq istifadə olunur.':e.status?e.message:'Server xətası.'});}

@@ -41,5 +41,24 @@ test('Şirkətlər, limitlər, səlahiyyətlər və tapşırıqlar',async t=>{
   await post('comment',m,{id:1,body:'Hazırdır'});assert.equal((await state(a)).comments.length,1);
   await post('user',a,{...member,active:false,password:''});assert.equal((await req('state',m)).status,401);
   await post('deleteTask',a,{id:1,version:2});assert.equal((await state(a)).comments.length,0);
+  const importRows=[
+    {line:2,name:'Excel Member',email:'excel-member@test.local',password},
+    {line:4,name:'Excel Admin',email:'excel-admin@test.local',password,role:'admin'},
+  ];
+  await post('importUsers',b,{company:1,rows:importRows},409);
+  await post('company',root,{id:2,plan:2,name:'beta',cap:3});
+  await post('importUsers',await sign('third@test.local'),{company:2,rows:importRows},403);
+  const invalidImport=await req('importUsers',b,{company:1,rows:[
+    importRows[0],{...importRows[1],email:'alpha@test.local'},
+  ]});
+  assert.equal(invalidImport.status,409);
+  assert.match((await invalidImport.json()).error,/Excel sətiri 4/);
+  assert.equal((await state(b)).users.length,1);
+  const imported=await req('importUsers',b,{company:1,rows:importRows});
+  assert.equal(imported.status,200);
+  assert.deepEqual(await imported.json(),{imported:2});
+  assert.ok(!(await state(a)).users.some(account=>account.email==='excel-member@test.local'));
+  assert.equal((await state(await sign('excel-admin@test.local'))).me.role,'admin');
+  assert.equal((await state(await sign('excel-member@test.local'))).me.role,'member');
   await post('logout',a,{});assert.equal((await req('state',a)).status,401);
 });
