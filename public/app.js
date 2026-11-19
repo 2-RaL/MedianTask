@@ -1,17 +1,15 @@
 const { createApp } = Vue;
 const icons={grid:'M3 3h7v7H3z M14 3h7v7h-7z M3 14h7v7H3z M14 14h7v7h-7z',board:'M3 4h18v16H3z M9 4v16 M15 4v16',list:'M7 6h14 M7 12h14 M7 18h14 M3 6h.1 M3 12h.1 M3 18h.1',box:'m12 2 9 5v10l-9 5-9-5V7z M3 7l9 5 9-5 M12 12v10',team:'M3 20v-2a5 5 0 0 1 10 0v2 M16 14a5 5 0 0 1 5 5 M12 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0 M16 4a4 4 0 0 1 0 8',report:'M3 3v18h18 M8 16v-5 M13 16V6 M18 16v-8',check:'m4 12 5 5L20 6',clock:'M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0 M12 6v6l4 2',search:'M17 10a7 7 0 1 1-14 0 7 7 0 0 1 14 0 M15 15l6 6',date:'M3 5h18v16H3z M7 2v6 M17 2v6 M3 10h18',plus:'M12 5v14 M5 12h14',logout:'M10 3H4v18h6 M9 12h12 M17 8l4 4-4 4',menu:'M3 5h18 M3 12h18 M3 19h18',flag:'M5 21V3c5-4 9 5 15 0v10c-6 5-10-4-15 0',company:'M4 21V3h12v18 M16 10h4v11 M2 21h20 M8 7h4 M8 11h4 M8 15h4'};
-const presentationRoles = [
-  {id:'platform',label:'Super admin'},
-  {id:'admin',label:'Şirkət admini'},
-  {id:'member',label:'Standart istifadəçi'},
+const autoFillUsers = [
+  {id:'platform',label:'Super admin',email:'r.tural.94@gmail.com',password:'Admin123456789*'},
+  {id:'admin',label:'Şirkət admini',email:'info@atm.gov.az',password:'ATM123456789*'},
+  {id:'member',label:'Standart user',email:'tural.rustamov@atm.gov.az',password:'ATM123456789*'},
 ];
-const presentationAccounts = new Map();
 
 const app=createApp({
  setup(){
   return {
-    presentationRoles,
-    preparedRoles: Vue.ref([]),
+    autoFillUsers,
   };
  },
  data:()=>({s:null,ready:false,demo:false,busy:false,error:'',toast:'',timer:null,page:'board',mobile:false,auth:{email:'',password:''},view:'board',query:'',project:'',priority:'',companyFilter:'',modal:'',form:{},note:'',drag:null,over:'',statuses:{todo:'Planlaşdırılıb',doing:'İcradadır',review:'Yoxlamada',done:'Tamamlanıb'},priorities:{low:'Aşağı',normal:'Orta',high:'Yüksək'},demos:[['Şirkət admini','leyla'],['Platforma admini','platform'],['İstifadəçi','murad']]}),
@@ -31,38 +29,18 @@ const app=createApp({
   modalTitle(){if(this.modal==='importUsers')return 'Excel ilə toplu əlavə et';return this.modal==='detail'?this.current?.title:this.modal==='deleteTask'?'Tapşırıq silinsin?':({task:'Tapşırıq',plan:'Paket',company:'Şirkət',user:'İstifadəçi',project:'Layihə'}[this.modal]||'')+(this.form.id?' · redaktə':' · əlavə et')}
  },
  async mounted(){
-  window.addEventListener('pagehide',this.clearPresentation);
   try{this.demo=(await this.api('info')).demo;await this.restore()}catch(e){if(e.status!==401)this.error=e.message}finally{this.ready=true}
  },
- beforeUnmount(){window.removeEventListener('pagehide',this.clearPresentation);this.clearPresentation()},
  methods:{
   async api(path,body){const r=await fetch('/api/'+path,body===undefined?{}:{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const d=await r.json();if(!r.ok){if(r.status===401&&this.s){this.close();this.s=null}throw Object.assign(Error(d.error),{status:r.status})}return d},
   async restore(){this.s=await this.api('state');this.go(this.isPlatform?'companies':'board')},
   async login(){this.busy=true;this.error='';try{await this.api('login',this.auth);await this.restore();this.auth.password=''}catch(e){this.error=e.message}finally{this.busy=false}},
-  preparePresentation(role,form){
-    const fields=new FormData(form);
-    presentationAccounts.set(role,{email:fields.get('email'),password:fields.get('password')});
-    this.preparedRoles=[...presentationAccounts.keys()];
-    form.reset();
-    if(this.preparedRoles.length===presentationRoles.length)form.closest('details').open=false;
-  },
-  fillPresentation(role){
+  fillUser(u){
     if(this.busy)return;
-    const account=presentationAccounts.get(role);
-    if(!account){
-      const setup=this.$refs.presentationSetup;
-      setup.open=true;
-      setup.querySelector(`[data-presentation-role="${role}"] input[name="email"]`)?.focus();
-      return;
-    }
-    this.auth={...account};
+    this.auth.email=u.email;
+    this.auth.password=u.password;
     this.error='';
     this.$nextTick(()=>this.$refs.loginSubmit?.focus());
-  },
-  clearPresentation(){
-    presentationAccounts.clear();
-    this.preparedRoles=[];
-    this.auth={email:'',password:''};
   },
   async demoLogin(name){
     if(!this.demo || this.busy)return;

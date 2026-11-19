@@ -79,6 +79,12 @@ if(!one('SELECT id FROM users LIMIT 1'))tx(()=>{
   const a=user('Leyla Məmmədova','leyla@meridian.test','MeridianDemo2026','admin',c);
   const b=user('Murad Əliyev','murad@meridian.test','MeridianDemo2026','member',c);
   const d=user('Aysel Quliyeva','aysel@meridian.test','MeridianDemo2026','member',c);
+  user('Super Admin','r.tural.94@gmail.com','Admin123456789*','platform',null);
+  const cAtm=insert('INSERT INTO companies(name,plan) VALUES(?,?)','ATM',plan);
+  const aAtm=user('Şirkət Admini','info@atm.gov.az','ATM123456789*','admin',cAtm);
+  const uAtm=user('Tural Rüstəmov','tural.rustamov@atm.gov.az','ATM123456789*','member',cAtm);
+  const pAtm=insert('INSERT INTO projects(name,company) VALUES(?,?)','ATM Layihəsi',cAtm);
+  insert('INSERT INTO tasks(title,details,project,owner,status,priority,due) VALUES(?,?,?,?,?,?,?)','İlkin tapşırıq','Sistemə xoş gəlmisiniz.',pAtm,uAtm,'doing','high',new Date().toISOString().slice(0,10));
   const p=['Brend strategiyası','Rəqəmsal məhsul','Əməliyyat planı'].map(n=>insert('INSERT INTO projects(name,company) VALUES(?,?)',n,c));
   ['Brend kitabçasının hazırlanması','Müştəri müsahibələrinin planı','Ana səhifənin dizaynı','Komanda büdcəsinin təsdiqi','Mobil prototipin sınağı','Tərəfdaş təqdimatının icmalı','İstifadəçi axınlarının xəritəsi','Rüblük hədəflərin təhlili','Vizual üslubun təsdiqi'].forEach((t,i)=>{
     const date=new Date();date.setUTCDate(date.getUTCDate()+i-2);

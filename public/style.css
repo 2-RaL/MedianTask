@@ -62,22 +62,24 @@
   stroke-linecap: round;
 }
 
-.presentation-access details {
-  margin: 14px 0;
+.autofill-access .autofill-list {
+  display: flex;
+  gap: 7px;
+  margin-top: 10px;
 }
 
-.presentation-access summary {
-  cursor: pointer;
+.autofill-access button {
+  flex: 1 1 0;
+  text-align: center;
+  font-weight: 500;
+  white-space: nowrap;
 }
 
-.presentation-access form {
-  margin: 10px 0;
-}
-
-.presentation-access fieldset {
-  min-width: 0;
-  border: 1px solid var(--line);
-  border-radius: 6px;
+.autofill-access button.active {
+  background: #dfebe0;
+  border-color: #799e7f;
+  box-shadow: 0 0 0 1px #799e7f;
+  font-weight: 600;
 }
 
 @media (max-width: 680px) {

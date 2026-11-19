@@ -87,24 +87,11 @@
 </svg>
 <div class="covertext"><small>KOMANDA ÜÇÜN İŞ MƏKANI</small><h1>Layihələriniz bir yerdə.</h1></div></section>
 <section class="loginform"><small>MERIDIAN WORKSPACE</small><h1>Hesabınıza daxil olun</h1><p>İş məkanınıza şirkət hesabınızla keçin.</p><form @submit.prevent="login"><label>E-poçt<input type="email" autocomplete="username" v-model="auth.email" required></label><label>Şifrə<input type="password" autocomplete="current-password" v-model="auth.password" required></label><p class="error" role="alert" v-if="error">{{error}}</p><button ref="loginSubmit" class="primary wide" :disabled="busy">Daxil ol <span>→</span></button></form>
-<div class="demobox presentation-access">
-  <small>TƏQDİMAT ÜÇÜN SÜRƏTLİ GİRİŞ</small>
-  <div>
-    <button v-for="role in presentationRoles" :key="role.id" type="button" :disabled="busy" @click="fillPresentation(role.id)">{{role.label}}</button>
+<div class="demobox autofill-access">
+  <small>AVTOMATİK DOLDURMA (AUTO FILL)</small>
+  <div class="autofill-list">
+    <button v-for="u in autoFillUsers" :key="u.email" type="button" :class="{active:auth.email===u.email}" :disabled="busy" @click="fillUser(u)" :title="`${u.label}: ${u.email}`">{{u.label}}</button>
   </div>
-  <details ref="presentationSetup">
-    <summary>Hesabları bu tab üçün hazırla</summary>
-    <p>Məlumatları bir dəfə daxil edin. Səhifə yenilənəndə və ya bağlananda onlar silinir.</p>
-    <form v-for="role in presentationRoles" :key="role.id" :data-presentation-role="role.id" autocomplete="off" @submit.prevent="preparePresentation(role.id,$event.currentTarget)">
-      <fieldset>
-        <legend>{{role.label}}</legend>
-        <label>E-poçt<input name="email" type="email" autocomplete="off" required></label>
-        <label>Şifrə<input name="password" type="password" autocomplete="off" required></label>
-        <button type="submit">{{preparedRoles.includes(role.id)?'Yenilə':'Hazırla'}}</button>
-      </fieldset>
-    </form>
-  </details>
-  <button v-if="preparedRoles.length" type="button" :disabled="busy" @click="clearPresentation">Məlumatları sil</button>
 </div>
 <div v-if="demo" class="demobox"><small>DEMO HESABI İLƏ SÜRƏTLİ GİRİŞ</small><div><button v-for="o in demos" :key="o[1]" type="button" @click="demoLogin(o[1])" :disabled="busy">{{o[0]}}</button></div></div></section></div>
 <div v-else class="shell"><aside :class="{opened:mobile}"><img class="brand" src="/meridian-logo.png" alt="MERİDİAN" width="2172" height="724"><div class="space"><b class="monogram">{{initials(s.company?.name||'Meridian')}}</b><div><strong>{{s.company?.name||'Meridian'}}</strong><small>{{isPlatform?'Platforma paneli':'Şirkət məkanı'}}</small></div></div><small class="navcaption">İDARƏETMƏ</small><nav><button v-for="n in nav" @click="go(n[0])" :class="{current:page===n[0]}"><ico :name="n[2]"></ico>{{n[1]}}</button></nav>
