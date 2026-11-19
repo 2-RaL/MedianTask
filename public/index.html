@@ -2,6 +2,7 @@
 <div v-if="!ready" class="loading">Meridian</div>
 <div v-else-if="!s" class="login">
 <section class="cover">
+<div class="sculpture" aria-hidden="true"><i v-for="line in 14" :key="line" :style="{'--i':line}"></i></div>
 <svg class="brand login-brand" v-logo-orbit viewBox="0 10 1180 330" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="MERİDİAN">
   <defs>
     <linearGradient id="goldOrbitGrad" x1="0%" y1="0%" x2="100%" y2="100%">

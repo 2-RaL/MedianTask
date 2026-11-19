@@ -8,7 +8,29 @@
   overflow: clip;
 }
 
-.cover { grid-area: 1 / 1; }
+.cover {
+  grid-area: 1 / 1;
+  isolation: isolate;
+}
+
+.sculpture {
+  position: absolute;
+  inset: 12% -15% 22% 17%;
+  z-index: -1;
+  pointer-events: none;
+  transform: rotate(-17deg);
+  opacity: .85;
+}
+
+.sculpture i {
+  position: absolute;
+  inset: calc(var(--i) * 2.1%) calc(var(--i) * 2.3%) calc(var(--i) * 1.1%);
+  border: 1px solid #a59062;
+  border-right-color: #365b4f;
+  border-bottom: 0;
+  border-radius: 52% 52% 0 0;
+  box-shadow: -6px -3px 10px #09251c55;
+}
 
 .login-brand {
   align-self: flex-start;
@@ -65,6 +87,7 @@
   }
 
   .login-brand { width: min(68vw, 285px); }
+  .sculpture { inset: 0 -5% -5% 52%; }
 
   .loginform {
     grid-area: 2 / 1;
