@@ -23,13 +23,21 @@
   margin: 40px auto;
 }
 
-.login-brand .logo-wordmark,
-.login-brand .logo-letter {
+.login-brand .letter-fill {
   fill: #f4e9d0;
 }
 
-.login-brand .logo-wordmark {
-  font: 400 184px var(--serif);
+.login-brand .letter-outline {
+  fill: none;
+  stroke: #cbb78e;
+  stroke-width: 1.45;
+  stroke-linejoin: round;
+}
+
+.login-brand .gold-ring {
+  fill: none;
+  stroke: url(#goldOrbitGrad);
+  stroke-linecap: round;
 }
 
 @media (max-width: 680px) {

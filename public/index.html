@@ -2,39 +2,87 @@
 <div v-if="!ready" class="loading">Meridian</div>
 <div v-else-if="!s" class="login">
 <section class="cover">
-<svg viewBox="0 0 1120 320" class="brand login-brand" role="img" aria-label="MERİDİAN" v-logo-orbit>
+<svg class="brand login-brand" v-logo-orbit viewBox="0 10 1180 330" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="MERİDİAN">
   <defs>
-    <linearGradient id="mGoldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+    <linearGradient id="goldOrbitGrad" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#8A683C" />
-      <stop offset="45%" stop-color="#DFC08D" />
+      <stop offset="48%" stop-color="#DFC08D" />
       <stop offset="100%" stop-color="#9E7B4F" />
     </linearGradient>
-    <linearGradient id="mGreenRibbon" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#0B2818" stop-opacity="0.15" />
-      <stop offset="50%" stop-color="#195434" stop-opacity="0.95" />
-      <stop offset="100%" stop-color="#0B2818" stop-opacity="0.15" />
+
+    <linearGradient id="goldRibbonGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#8A683C" stop-opacity="0.06" />
+      <stop offset="28%" stop-color="#C8A26B" stop-opacity="0.94" />
+      <stop offset="52%" stop-color="#F4DCAD" stop-opacity="1" />
+      <stop offset="80%" stop-color="#9E7B4F" stop-opacity="0.92" />
+      <stop offset="100%" stop-color="#7D5D34" stop-opacity="0.04" />
     </linearGradient>
-    <linearGradient id="mGoldRibbon" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#9E7B4F" stop-opacity="0.1" />
-      <stop offset="50%" stop-color="#E5C694" stop-opacity="1" />
-      <stop offset="100%" stop-color="#9E7B4F" stop-opacity="0.1" />
+
+    <linearGradient id="greenRibbonGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#0B2818" stop-opacity="0.06" />
+      <stop offset="30%" stop-color="#14452B" stop-opacity="0.94" />
+      <stop offset="52%" stop-color="#297B4F" stop-opacity="1" />
+      <stop offset="80%" stop-color="#0B2818" stop-opacity="0.92" />
+      <stop offset="100%" stop-color="#071A10" stop-opacity="0.04" />
     </linearGradient>
   </defs>
 
   <g data-ribbon-back aria-hidden="true"></g>
-  <text class="logo-wordmark" x="65" y="245" textLength="450" lengthAdjust="spacingAndGlyphs" aria-hidden="true">MERİ</text>
-  <g transform="translate(565, 78)">
-    <path fill="none" stroke="url(#mGoldGrad)" stroke-width="6" stroke-linecap="round" d="M 10,122 C -32,126 -35,95 15,68" />
-    <path
-      class="logo-letter"
-      d="M -4,8 C 64,4 116,40 116,92 C 116,144 64,180 -4,176 L 2,169 L 2,15 Z M 16,18 L 16,86 L 56,86 C 55,50 40,24 16,18 Z M 64,86 L 101,86 C 98,48 72,22 36,18 C 52,30 62,55 64,86 Z M 16,96 L 16,166 C 40,160 55,134 56,96 Z M 64,96 C 62,127 52,152 36,164 C 72,160 98,134 101,96 Z"
-    />
-    <path fill="none" stroke="url(#mGoldGrad)" stroke-width="7.5" stroke-linecap="round" d="M -18,118 C 22,138 118,86 138,44 C 145,29 132,20 110,28" />
-    <circle cx="134" cy="31" r="8.5" fill="url(#mGoldGrad)" />
+
+  <g class="logo-vector-letters">
+    <g>
+      <path class="letter-outline" d="M 19,19 C 47,19 65,34 86,73 L 146,184 L 204,72 L 236,72 L 236,79 C 226,80 223,85 223,97 L 223,217 C 223,229 226,234 236,235 L 236,240 L 190,240 L 190,235 C 200,234 203,229 203,217 L 203,92 L 142,206 L 195,297 C 207,315 223,322 246,323 L 246,328 C 212,328 191,317 174,289 L 88,131 L 88,217 C 88,229 91,234 101,235 L 101,240 L 66,240 L 66,235 C 76,234 79,229 79,217 L 79,117 L 67,95 C 49,61 37,29 19,27 Z" />
+      <path class="letter-fill" d="M 22,22 C 48,22 65,36 86,74 L 146,184 L 204,74 L 234,74 L 234,78 C 224,79 221,84 221,96 L 221,216 C 221,228 224,233 234,234 L 234,238 L 192,238 L 192,234 C 202,233 205,228 205,216 L 205,86 L 142,204 L 194,296 C 206,314 222,321 244,322 L 244,326 C 212,326 192,315 176,288 L 86,126 L 86,216 C 86,228 89,233 99,234 L 99,238 L 68,238 L 68,234 C 78,233 81,228 81,216 L 81,116 L 69,94 C 51,60 39,28 22,26 Z" />
+    </g>
+
+    <g>
+      <path class="letter-outline" d="M 242,72 L 348,72 L 353,108 L 346,108 C 340,87 331,81 306,81 L 275,81 L 275,150 L 304,150 C 321,150 327,144 330,130 L 337,130 L 337,179 L 330,179 C 327,165 321,159 304,159 L 275,159 L 275,231 L 310,231 C 335,231 346,223 354,200 L 361,200 L 354,240 L 242,240 L 242,235 C 252,234 255,229 255,217 L 255,95 C 255,83 252,78 242,77 Z" />
+      <path class="letter-fill" d="M 244,74 L 346,74 L 351,106 L 347,106 C 341,85 332,79 306,79 L 273,79 L 273,152 L 304,152 C 322,152 328,146 331,132 L 335,132 L 335,177 L 331,177 C 328,163 322,157 304,157 L 273,157 L 273,233 L 310,233 C 336,233 347,225 355,202 L 359,202 L 352,238 L 244,238 L 244,234 C 254,233 257,228 257,216 L 257,96 C 257,84 254,79 244,78 Z" />
+    </g>
+
+    <g>
+      <path class="letter-outline" d="M 364,72 L 432,72 C 469,72 490,89 490,116 C 490,141 471,157 444,161 C 458,168 469,183 482,209 C 498,240 513,261 536,261 C 553,261 566,252 575,237 L 581,242 C 570,260 552,271 528,271 C 497,271 477,249 459,211 C 444,180 435,165 416,165 L 397,165 L 397,217 C 397,229 400,234 410,235 L 410,240 L 364,240 L 364,235 C 374,234 377,229 377,217 L 377,95 C 377,83 374,78 364,77 Z" />
+      <path class="letter-fill" d="M 366,74 L 432,74 C 468,74 488,90 488,116 C 488,140 469,156 441,160 C 456,166 467,182 480,208 C 496,240 512,262 536,262 C 554,262 567,253 576,239 L 579,242 C 568,259 551,269 528,269 C 498,269 479,248 461,210 C 446,178 436,163 416,163 L 395,163 L 395,216 C 395,228 398,233 408,234 L 408,238 L 366,238 L 366,234 C 376,233 379,228 379,216 L 379,96 C 379,84 376,79 366,78 Z M 395,79 L 395,158 L 424,158 C 455,158 471,142 471,116 C 471,92 455,79 426,79 Z" />
+    </g>
+
+    <g>
+      <circle class="letter-outline" cx="538" cy="52" r="9.5" />
+      <circle class="letter-fill" cx="538" cy="52" r="6" />
+      <path class="letter-outline" d="M 514,72 L 562,72 L 562,79 C 551,80 548,85 548,97 L 548,217 C 548,229 551,234 562,235 L 562,240 L 514,240 L 514,235 C 525,234 528,229 528,217 L 528,97 C 528,85 525,80 514,79 Z" />
+      <path class="letter-fill" d="M 516,74 L 560,74 L 560,78 C 549,79 546,84 546,96 L 546,216 C 546,228 549,233 560,234 L 560,238 L 516,238 L 516,234 C 527,233 530,228 530,216 L 530,96 C 530,84 527,79 516,78 Z" />
+    </g>
+
+    <g>
+      <circle class="letter-outline" cx="818" cy="52" r="9.5" />
+      <circle class="letter-fill" cx="818" cy="52" r="6" />
+      <path class="letter-outline" d="M 794,72 L 842,72 L 842,79 C 831,80 828,85 828,97 L 828,217 C 828,229 831,234 842,235 L 842,240 L 794,240 L 794,235 C 805,234 808,229 808,217 L 808,97 C 808,85 805,80 794,79 Z" />
+      <path class="letter-fill" d="M 796,74 L 840,74 L 840,78 C 829,79 826,84 826,96 L 826,216 C 826,228 829,233 840,234 L 840,238 L 796,238 L 796,234 C 807,233 810,228 810,216 L 810,96 C 810,84 807,79 796,78 Z" />
+    </g>
+
+    <g>
+      <path class="letter-outline" d="M 919,70 L 927,70 L 989,217 C 994,228 998,232 1007,233 L 1007,240 L 958,240 L 958,233 C 968,232 970,228 966,217 L 952,183 L 889,183 L 875,217 C 870,228 873,232 885,233 L 885,240 L 850,240 L 850,233 C 858,232 862,227 867,215 Z" />
+      <path class="letter-fill" d="M 920,72 L 926,72 L 987,218 C 992,229 996,233 1005,234 L 1005,238 L 960,238 L 960,234 C 970,233 972,229 968,218 L 953,181 L 888,181 L 873,217 C 868,228 871,233 883,234 L 883,238 L 852,238 L 852,234 C 860,233 864,228 869,216 Z M 919,96 L 890,175 L 951,175 Z" />
+    </g>
+
+    <g>
+      <path class="letter-outline" d="M 1010,72 L 1043,72 L 1124,202 L 1124,97 C 1124,85 1120,80 1108,79 L 1108,72 L 1148,72 L 1148,79 C 1137,80 1134,85 1134,97 L 1134,242 L 1127,242 L 1036,96 L 1036,217 C 1036,229 1039,234 1051,235 L 1051,240 L 1011,240 L 1011,235 C 1022,234 1025,229 1025,217 L 1025,97 C 1025,85 1022,80 1010,79 Z" />
+      <path class="letter-fill" d="M 1012,74 L 1042,74 L 1126,208 L 1126,96 C 1126,84 1122,79 1110,78 L 1110,74 L 1146,74 L 1146,78 C 1135,79 1132,84 1132,96 L 1132,240 L 1128,240 L 1034,90 L 1034,216 C 1034,228 1037,233 1049,234 L 1049,238 L 1013,238 L 1013,234 C 1024,233 1027,228 1027,216 L 1027,96 C 1027,84 1024,79 1012,78 Z" />
+    </g>
+  </g>
+
+
+  <g id="center-d-letter" transform="translate(612, 64) scale(1.06)">
+    <path class="gold-ring" stroke-width="6.2" d="M 10,122 C -32,126 -35,95 15,68" />
+
+    <path class="letter-outline" d="M -8,4 C 68,0 122,38 122,92 C 122,146 68,184 -8,180 L -2,172 L -2,12 Z" />
+
+    <path class="letter-fill" d="M -4,8 C 64,4 116,40 116,92 C 116,144 64,180 -4,176 L 2,169 L 2,15 Z M 16,18 L 16,86 L 56,86 C 55,50 40,24 16,18 Z M 64,86 L 101,86 C 98,48 72,22 36,18 C 52,30 62,55 64,86 Z M 16,96 L 16,166 C 40,160 55,134 56,96 Z M 64,96 C 62,127 52,152 36,164 C 72,160 98,134 101,96 Z" />
+
+    <path class="gold-ring" stroke-width="7.8" d="M -18,118 C 22,138 118,86 138,44 C 145,29 132,20 110,28" />
+    <circle cx="134" cy="31" r="8.8" fill="url(#goldOrbitGrad)" />
   </g>
 
   <g data-ribbon-front aria-hidden="true"></g>
-  <text class="logo-wordmark" x="742" y="245" textLength="318" lengthAdjust="spacingAndGlyphs" aria-hidden="true">İAN</text>
 </svg>
 <div class="covertext"><small>KOMANDA ÜÇÜN İŞ MƏKANI</small><h1>Layihələriniz bir yerdə.</h1></div></section>
 <section class="loginform"><small>MERIDIAN WORKSPACE</small><h1>Hesabınıza daxil olun</h1><p>İş məkanınıza şirkət hesabınızla keçin.</p><form @submit.prevent="login"><label>E-poçt<input type="email" autocomplete="username" v-model="auth.email" required></label><label>Şifrə<input type="password" autocomplete="current-password" v-model="auth.password" required></label><p class="error" role="alert" v-if="error">{{error}}</p><button class="primary wide" :disabled="busy">Daxil ol <span>→</span></button></form><div v-if="demo" class="demobox"><small>DEMO HESABI İLƏ SÜRƏTLİ GİRİŞ</small><div><button v-for="o in demos" :key="o[1]" type="button" @click="demoLogin(o[1])" :disabled="busy">{{o[0]}}</button></div></div></section></div>

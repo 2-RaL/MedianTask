@@ -52,31 +52,31 @@ app.component('ico',{props:['name'],setup(){return {icons}},template:'<svg class
 const orbitStops = new WeakMap();
 app.directive('logo-orbit', {
   mounted(svg) {
-    const centerX = 622;
-    const centerY = 168;
+    const centerX = 674;
+    const centerY = 161;
     const ribbonCount = 12;
     const backLayer = svg.querySelector('[data-ribbon-back]');
     const frontLayer = svg.querySelector('[data-ribbon-front]');
     const ribbons = Array.from({ length: ribbonCount }, (_, index) => {
       const gold = index % 2 === 0;
-      const tilt = (-32 + (index - 5.5) * 4.2) * Math.PI / 180;
+      const tilt = (-30 + (index - 5.5) * 4.4) * Math.PI / 180;
       function makePath(layer, opacity) {
         const path = document.createElementNS(svg.namespaceURI, 'path');
         path.setAttribute('fill', 'none');
-        path.setAttribute('stroke', gold ? 'url(#mGoldRibbon)' : 'url(#mGreenRibbon)');
-        path.setAttribute('stroke-width', gold ? 2.4 + (index % 3) * .6 : 2.8);
+        path.setAttribute('stroke', gold ? 'url(#goldRibbonGrad)' : 'url(#greenRibbonGrad)');
+        path.setAttribute('stroke-width', gold ? 2.6 + (index % 3) * .65 : 3.05);
         path.setAttribute('stroke-linecap', 'round');
         path.setAttribute('opacity', opacity);
         layer.append(path);
         return path;
       }
       return {
-        back: makePath(backLayer, .4),
-        front: makePath(frontLayer, .95),
-        radiusX: 95 + (index % 4) * 14,
-        radiusY: 36 + (index % 3) * 9,
+        back: makePath(backLayer, .42),
+        front: makePath(frontLayer, .96),
+        radiusX: 108 + (index % 4) * 14,
+        radiusY: 42 + (index % 3) * 10,
         phase: index / ribbonCount * Math.PI * 2,
-        speed: 1.8 + (index % 3) * .22,
+        speed: 1.75 + (index % 3) * .24,
         cosTilt: Math.cos(tilt),
         sinTilt: Math.sin(tilt),
       };
@@ -88,8 +88,8 @@ app.directive('logo-orbit', {
         let front = '';
         let back = '';
         let wasInFront;
-        for (let point = 0; point <= 24; point++) {
-          const angle = head - point * 2.2 / 24;
+        for (let point = 0; point <= 26; point++) {
+          const angle = head - point * 2.35 / 26;
           const depth = Math.sin(angle);
           const x = Math.cos(angle) * ribbon.radiusX;
           const y = depth * ribbon.radiusY;
