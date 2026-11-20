@@ -50,10 +50,16 @@ test('Şirkətlər, limitlər, səlahiyyətlər və tapşırıqlar',async t=>{
   assert.equal(notesAfter.find(n=>n.title==='Sərbəst qeyd').date,null);
   await post('deleteNote',a,{id:notesAfter[0].id});
   assert.equal((await state(a)).notes.length,1);
-  await post('profile',a,{name:'Alpha Boss',email:'alpha-new@test.local',password:'NewPassword2026*'});
+  const sampleAvatar='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+  await post('profile',a,{name:'Alpha Boss',email:'alpha-new@test.local',password:'NewPassword2026*',avatar:sampleAvatar});
   const aState=await state(a);
   assert.equal(aState.me.name,'Alpha Boss');
   assert.equal(aState.me.email,'alpha-new@test.local');
+  assert.equal(aState.me.avatar,sampleAvatar);
+  assert.equal(aState.users.find(u=>u.id===aState.me.id).avatar,sampleAvatar);
+  await post('profile',a,{name:'Alpha Boss',email:'alpha-new@test.local',avatar:'invalid-avatar-format'},400);
+  await post('profile',a,{name:'Alpha Boss',email:'alpha-new@test.local',avatar:''});
+  assert.equal((await state(a)).me.avatar,null);
   const aLogin=await req('login','',{email:'alpha-new@test.local',password:'NewPassword2026*'});
   assert.equal(aLogin.status,200);
   await post('profile',a,{name:'Alpha Original',email:'alpha@test.local',password});
@@ -245,6 +251,11 @@ test('Şirkətlər, limitlər, səlahiyyətlər və tapşırıqlar',async t=>{
   const indexHtmlContent = await readFile(fileURLToPath(new URL('../public/index.html', import.meta.url)), 'utf-8');
   assert.ok(!indexHtmlContent.includes('class="sideProjects"'), 'Duplicate sideProjects block must be removed');
   assert.ok(indexHtmlContent.includes('detail-tabs-bar'), 'Task detail should have tabs for history and comments');
+  assert.ok(!indexHtmlContent.includes('👑'), 'Crown emoji must be removed from task creation');
+
+  const styleCssContent = await readFile(fileURLToPath(new URL('../public/style.css', import.meta.url)), 'utf-8');
+  assert.ok(styleCssContent.includes('.lane.ltodo h3') && styleCssContent.includes('.lane.ldoing h3') && styleCssContent.includes('.lane.lreview h3') && styleCssContent.includes('.lane.ldone h3'), 'Status column headers have custom backgrounds');
+  assert.ok(styleCssContent.includes('.profile-avatar-row'), 'Profile avatar row styling is defined');
 
   // Verify standard member nav does not have 'mine' (Mənim tapşırıqlarım)
   assert.ok(!appJsContent.includes("['mine','Mənim tapşırıqlarım','check'],\n      ['projects','Layihələr','folder'],\n      ['notes','Qeydlər','date'],\n      ['reports','Hesabatlar','report']\n    ];"), 'Member nav must not have mine');

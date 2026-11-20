@@ -457,7 +457,75 @@ const app=createApp({
     return this.s.tasks.filter(t=>t.company_id===Number(cid)).length;
   },
   roleName(r){return {platform:'Platforma administratoru',admin:'Şirkət administratoru',member:'Əməkdaş'}[r]},
-  initials(n){return n.split(/\s+/).slice(0,2).map(s=>s[0]).join('').toLocaleUpperCase('az')},person(id){return this.s.users.find(u=>u.id===id)?.name||'Təyin edilməyib'},
+  initials(n){return (n||'').split(/\s+/).slice(0,2).map(s=>s[0]||'').join('').toLocaleUpperCase('az')},person(id){return this.s.users.find(u=>u.id===id)?.name||'Təyin edilməyib'},
+  userAvatar(idOrObj){
+    if(!idOrObj)return null;
+    if(typeof idOrObj==='object'){
+      if(idOrObj.avatar)return idOrObj.avatar;
+      if(idOrObj.id){
+        if(idOrObj.id===this.s.me?.id)return this.s.me?.avatar||null;
+        const u=this.s.users?.find(x=>x.id===idOrObj.id);
+        return u?.avatar||null;
+      }
+      return null;
+    }
+    if(idOrObj===this.s.me?.id)return this.s.me?.avatar||null;
+    const user=this.s.users?.find(u=>u.id===idOrObj);
+    return user?.avatar||null;
+  },
+  onAvatarChange(e){
+    const file=e.target?.files?.[0];
+    if(!file)return;
+    if(!file.type.startsWith('image/')){
+      this.error='Yalnız şəkil formatı qəbul olunur.';
+      return;
+    }
+    if(file.size>8*1024*1024){
+      this.error='Şəklin həcmi çox böyükdür (maksimum 8 MB).';
+      return;
+    }
+    const reader=new FileReader();
+    reader.onload=(evt)=>{
+      const img=new Image();
+      img.onload=()=>{
+        try{
+          const maxDim=256;
+          let w=img.width;
+          let h=img.height;
+          if(w>maxDim||h>maxDim){
+            if(w>h){
+              h=Math.round((h*maxDim)/w);
+              w=maxDim;
+            }else{
+              w=Math.round((w*maxDim)/h);
+              h=maxDim;
+            }
+          }
+          const canvas=document.createElement('canvas');
+          canvas.width=w;
+          canvas.height=h;
+          const ctx=canvas.getContext('2d');
+          ctx.drawImage(img,0,0,w,h);
+          this.form.avatar=canvas.toDataURL('image/jpeg',0.85);
+          this.error='';
+        }catch(err){
+          this.error='Şəkli emal etmək mümkün olmadı.';
+        }
+      };
+      img.onerror=()=>{
+        this.error='Şəkil yüklənərkən xəta baş verdi.';
+      };
+      img.src=evt.target.result;
+    };
+    reader.onerror=()=>{
+      this.error='Fayl oxunarkən xəta baş verdi.';
+    };
+    reader.readAsDataURL(file);
+    e.target.value='';
+  },
+  removeAvatar(){
+    this.form.avatar='';
+  },
   projectName(id){return this.s.projects.find(p=>p.id===id)?.name},projectIndex(id){return this.s.projects.findIndex(p=>p.id===id)%4},
   openProjectEdit(id){
     const p=this.s?.projects?.find(x=>x.id===Number(id));
@@ -505,7 +573,8 @@ const app=createApp({
       this.form={
         name:this.s.me.name,
         email:this.s.me.email,
-        password:''
+        password:'',
+        avatar:this.s.me.avatar||''
       };
     }else if(type==='group'){
       const activeFirst=this.activeUsers[0]?.id||'';

@@ -36,6 +36,7 @@ try{db.exec('ALTER TABLE tasks ADD COLUMN group_id INTEGER REFERENCES groups(id)
 try{db.exec('ALTER TABLE tasks ADD COLUMN created_by INTEGER REFERENCES users(id) ON DELETE SET NULL;');}catch{}
 try{db.exec('ALTER TABLE tasks ADD COLUMN supervisor INTEGER REFERENCES users(id) ON DELETE SET NULL;');}catch{}
 try{db.exec('ALTER TABLE tasks ADD COLUMN created TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP;');}catch{}
+try{db.exec('ALTER TABLE users ADD COLUMN avatar TEXT;');}catch{}
 try{db.exec('CREATE TABLE IF NOT EXISTS note_shares(note_id INTEGER NOT NULL REFERENCES notes(id) ON DELETE CASCADE,user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,PRIMARY KEY(note_id, user_id));');}catch{}
 try{db.exec('CREATE TABLE IF NOT EXISTS task_history(id INTEGER PRIMARY KEY, task INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE, actor INTEGER REFERENCES users(id) ON DELETE SET NULL, action TEXT NOT NULL, details TEXT, created TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);');}catch{}
 const one=(sql,...p)=>db.prepare(sql).get(...p);
@@ -111,7 +112,7 @@ if(!one('SELECT id FROM users LIMIT 1'))tx(()=>{
     insert('INSERT INTO tasks(title,details,project,owner,status,priority,due) VALUES(?,?,?,?,?,?,?)',t,'Nəticəni komanda ilə paylaşın və yekun rəyi qeyd edin.',p[[0,0,1,2,1,0,1,2,0][i]],[a,b,d][i%3],statuses[[0,0,1,2,1,2,3,0,3][i]],priorities[(i+2)%3],date.toISOString().slice(0,10));
   });
 });
-const publicUser='id,name,email,role,company,active';
+const publicUser='id,name,email,role,company,active,avatar';
 const companySQL='SELECT c.*,p.name AS package,coalesce(c.cap,p.seats) AS seats,(SELECT count(*) FROM users u WHERE u.company=c.id AND active=1) AS used FROM companies c JOIN plans p ON p.id=c.plan';
 function company(id){return one(companySQL+' WHERE c.id=?',id)||fail('Şirkət tapılmadı.',404);}
 function task(id,c,u){
@@ -250,12 +251,27 @@ function change(action,b,u){
       if(one('SELECT id FROM users WHERE email=? AND id<>?',newEmail,u.id)){
         fail('Bu e-poçt ünvanı artıq istifadə olunur.',409);
       }
-      run('UPDATE users SET name=?, email=? WHERE id=?',newName,newEmail,u.id);
+      let avatarVal=u.avatar||null;
+      if(b.avatar!==undefined){
+        if(!b.avatar){
+          avatarVal=null;
+        }else if(typeof b.avatar==='string'){
+          if(!b.avatar.startsWith('data:image/')){
+            fail('Yalnız şəkil formatı qəbul olunur.');
+          }
+          if(b.avatar.length>1.5*1024*1024){
+            fail('Profil şəklinin həcmi çox böyükdür (maksimum 1 MB).');
+          }
+          avatarVal=b.avatar;
+        }
+      }
+      run('UPDATE users SET name=?, email=?, avatar=? WHERE id=?',newName,newEmail,avatarVal,u.id);
       if(b.password){
         run('UPDATE users SET hash=? WHERE id=?',hash(b.password),u.id);
       }
       u.name=newName;
       u.email=newEmail;
+      u.avatar=avatarVal;
       break;
     }
     case 'group':{
@@ -598,7 +614,7 @@ const server = http.createServer(async(req,res)=>{
     if(req.method==='POST'){
       if(req.headers.origin && (appOrigin ? req.headers.origin !== appOrigin : new URL(req.headers.origin).host !== req.headers.host))fail('Mənbə qəbul edilmir.',403);
       if(!req.headers['content-type']?.startsWith('application/json'))fail('JSON tələb olunur.',415);
-      const bodyLimit=path==='/api/importUsers'?131072:32768;
+      const bodyLimit=path==='/api/importUsers'?131072:(path==='/api/profile'?2097152:32768);
       const chunks=[];let size=0;for await(const chunk of req){size+=chunk.length;if(size>bodyLimit)fail('Sorğu çox böyükdür.',413);chunks.push(chunk);}
       try{b=JSON.parse(Buffer.concat(chunks));if(!b||typeof b!=='object'||Array.isArray(b))throw Error();}catch{fail('Sorğu formatı yanlışdır.');}
     }
