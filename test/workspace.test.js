@@ -246,5 +246,8 @@ test('Şirkətlər, limitlər, səlahiyyətlər və tapşırıqlar',async t=>{
   assert.ok(!indexHtmlContent.includes('class="sideProjects"'), 'Duplicate sideProjects block must be removed');
   assert.ok(indexHtmlContent.includes('detail-tabs-bar'), 'Task detail should have tabs for history and comments');
 
+  // Verify standard member nav does not have 'mine' (Mənim tapşırıqlarım)
+  assert.ok(!appJsContent.includes("['mine','Mənim tapşırıqlarım','check'],\n      ['projects','Layihələr','folder'],\n      ['notes','Qeydlər','date'],\n      ['reports','Hesabatlar','report']\n    ];"), 'Member nav must not have mine');
+
   await post('logout',a,{});assert.equal((await req('state',a)).status,401);
 });

@@ -49,13 +49,19 @@ const app=createApp({
       ['plans','Paketlər','box'],
       ['team','İstifadəçilər','team']
     ];
-    return [
+    if(this.admin)return [
       ['board','Tapşırıq lövhəsi','board'],
       ['mine','Mənim tapşırıqlarım','check'],
       ['projects','Layihələr','folder'],
       ['notes','Qeydlər','date'],
       ['reports','Hesabatlar','report'],
-      ...(this.admin?[['team','Komanda','team']]:[])
+      ['team','Komanda','team']
+    ];
+    return [
+      ['board','Tapşırıq lövhəsi','board'],
+      ['projects','Layihələr','folder'],
+      ['notes','Qeydlər','date'],
+      ['reports','Hesabatlar','report']
     ];
   },
   pageName(){return this.nav.find(n=>n[0]===this.page)?.[1]},
