@@ -42,7 +42,7 @@ const app=createApp({
       ['mine','Mənim tapşırıqlarım','check'],
       ['notes','Qeydlər','date'],
       ['reports','Hesabatlar','report'],
-      ['companies','Şirkətlər','company'],
+      ['companies','Qurumlar','company'],
       ['plans','Paketlər','box'],
       ['team','İstifadəçilər','team']
     ];
@@ -64,8 +64,8 @@ const app=createApp({
       mine:'Sizə həvalə edilmiş tapşırıqlar və son tarixlər.',
       notes:'Şəxsi və paylaşılan təqvim qeydləri, xatırlatmalar və sərbəst qeydlər.',
       reports:reportsSub,
-      companies:'Şirkətlərin paketləri, administratorları və istifadəçi yerləri.',
-      plans:'Şirkətlər üçün standart paketlər və istifadəçi limitləri.',
+      companies:'Qurumların paketləri, administratorları və istifadəçi yerləri.',
+      plans:'Qurumlar üçün standart paketlər və istifadəçi limitləri.',
       team:'Komanda üzvləri, rollar və giriş səlahiyyətləri.'
     }[this.page];
   },
@@ -334,9 +334,9 @@ const app=createApp({
         return {id:u.id,name:u.name,role:u.role,total,done,doing,late,pct,barPct:Math.round((total/maxUserTasks)*100)};
       });
   },
-  platformMetrics(){return [['Şirkətlər',this.s.companies.length,'company'],['Aktiv hesablar',this.s.users.filter(u=>u.active).length,'team'],['Paketlər',this.s.plans.length,'box'],['Boş yerlər',this.s.companies.reduce((n,c)=>n+c.seats-c.used,0),'grid']]},
+  platformMetrics(){return [['Qurumlar',this.s.companies.length,'company'],['Aktiv hesablar',this.s.users.filter(u=>u.active).length,'team'],['Paketlər',this.s.plans.length,'box'],['Boş yerlər',this.s.companies.reduce((n,c)=>n+c.seats-c.used,0),'grid']]},
   current(){return this.s?.tasks?.find(t=>t.id===this.form.id)},
-  actionLabel(){if(this.page==='reports')return 'Excel yüklə';if(this.page==='notes')return '';return (this.admin||this.isPlatform)?{board:'Yeni tapşırıq',mine:'Yeni tapşırıq',team:'İstifadəçi əlavə et',companies:'Şirkət əlavə et',plans:'Yeni paket'}[this.page]||'':'';},
+  actionLabel(){if(this.page==='reports')return 'Excel yüklə';if(this.page==='notes')return '';return (this.admin||this.isPlatform)?{board:'Yeni tapşırıq',mine:'Yeni tapşırıq',team:'İstifadəçi əlavə et',companies:'Qurum əlavə et',plans:'Yeni paket'}[this.page]||'':'';},
   modalTitle(){
     if(this.modal==='shareNote')return 'Qeydi paylaş';
     if(this.modal==='profile')return 'Profil məlumatları';
@@ -345,7 +345,7 @@ const app=createApp({
     if(this.modal==='importUsers')return 'Excel ilə toplu əlavə et';
     if(this.modal==='deleteUser')return 'İstifadəçi silinsin?';
     if(this.modal==='deleteTask')return 'Tapşırıq silinsin?';
-    return this.modal==='detail'?this.current?.title:({task:'Tapşırıq',plan:'Paket',company:'Şirkət',user:'İstifadəçi',project:'Layihə'}[this.modal]||'')+(this.form.id?' · redaktə':' · əlavə et');
+    return this.modal==='detail'?this.current?.title:({task:'Tapşırıq',plan:'Paket',company:'Qurum',user:'İstifadəçi',project:'Layihə'}[this.modal]||'')+(this.form.id?' · redaktə':' · əlavə et');
   },
   selectedGroupObj(){
     return this.s?.groups?.find(g=>g.id===Number(this.form.group));
