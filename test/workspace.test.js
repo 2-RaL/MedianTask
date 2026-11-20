@@ -2,7 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
 import {once} from 'node:events';
-import {mkdtemp,rm} from 'node:fs/promises';
+import {mkdtemp,rm,readFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {createServer} from 'node:net';
@@ -189,6 +189,12 @@ test('Şirkətlər, limitlər, səlahiyyətlər və tapşırıqlar',async t=>{
   // Super Admin creating calendar note
   await post('note', root, {title: 'Super Qeyd', content: 'Kalendar qeydi', date: '2026-11-20'});
   assert.ok((await state(root)).notes.some(n => n.title === 'Super Qeyd'));
+
+  // Test Excel Dashboard structure in public/app.js
+  const appJsContent = await readFile(fileURLToPath(new URL('../public/app.js', import.meta.url)), 'utf-8');
+  assert.ok(appJsContent.includes('Worksheet ss:Name="İdarəetmə Paneli"'), 'Excel export must contain Dashboard worksheet');
+  assert.ok(appJsContent.includes('Worksheet ss:Name="Tapşırıqlar"'), 'Excel export must contain Tasks worksheet');
+  assert.ok(appJsContent.includes('CƏMİ TAPŞIRIQ') && appJsContent.includes('VAXTINDA İCRA'), 'Excel Dashboard contains KPI cards');
 
   await post('logout',a,{});assert.equal((await req('state',a)).status,401);
 });

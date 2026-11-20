@@ -669,11 +669,323 @@ const app=createApp({
   excel(){
     const tasks=this.page==='reports'?this.reportTasks:(this.page==='mine'?this.baseTasks:this.filtered);
     const esc=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&apos;');
+
+    const total=tasks.length;
+    const todo=tasks.filter(x=>x.status==='todo').length;
+    const doing=tasks.filter(x=>x.status==='doing').length;
+    const review=tasks.filter(x=>x.status==='review').length;
+    const done=tasks.filter(x=>x.status==='done').length;
+    const late=tasks.filter(this.late).length;
+    const onTimeRate=total?Math.round(((total-late)/total)*100):100;
+    const doneRate=total?Math.round((done/total)*100):0;
+
+    const high=tasks.filter(x=>x.priority==='high').length;
+    const normal=tasks.filter(x=>x.priority==='normal').length;
+    const low=tasks.filter(x=>x.priority==='low').length;
+
+    const todoPct=total?Math.round((todo/total)*100):0;
+    const doingPct=total?Math.round((doing/total)*100):0;
+    const reviewPct=total?Math.round((review/total)*100):0;
+    const donePct=total?Math.round((done/total)*100):0;
+
+    const highPct=total?Math.round((high/total)*100):0;
+    const normalPct=total?Math.round((normal/total)*100):0;
+    const lowPct=total?Math.round((low/total)*100):0;
+
+    const makeBar=pct=>{
+      const filled=Math.min(10,Math.max(0,Math.round(pct/10)));
+      return '█'.repeat(filled)+'░'.repeat(10-filled)+' '+pct+'%';
+    };
+
+    const currentOrgTitle=(this.isPlatform&&this.companyFilter&&this.companyFilter!=='platform')
+      ? this.companyName(this.companyFilter)
+      : (this.isPlatform?'Bütün Qurumlar (Platforma)':(this.s?.company?.name||'Meridian'));
+
+    const activeProjects=(this.isPlatform&&this.companyFilter&&this.companyFilter!=='platform')
+      ? (this.s?.projects||[]).filter(p=>p.company===Number(this.companyFilter))
+      : (this.s?.projects||[]);
+
+    const projectRows=activeProjects
+      .map(p=>{
+        const pTasks=tasks.filter(t=>t.project===p.id);
+        const pTotal=pTasks.length;
+        const pDone=pTasks.filter(t=>t.status==='done').length;
+        const pDoing=pTasks.filter(t=>t.status==='doing').length;
+        const pReview=pTasks.filter(t=>t.status==='review').length;
+        const pTodo=pTasks.filter(t=>t.status==='todo').length;
+        const pLate=pTasks.filter(this.late).length;
+        const pPct=pTotal?Math.round((pDone/pTotal)*100):0;
+        return {id:p.id,name:p.name,total:pTotal,done:pDone,doing:pDoing,review:pReview,todo:pTodo,late:pLate,pct:pPct};
+      })
+      .filter(p=>p.total>0||this.admin||this.isPlatform);
+
+    const activeUsers=(this.isPlatform&&this.companyFilter&&this.companyFilter!=='platform')
+      ? (this.s?.users||[]).filter(u=>u.company===Number(this.companyFilter))
+      : (this.s?.users||[]);
+
+    const userRows=activeUsers
+      .map(u=>{
+        const uTasks=tasks.filter(t=>t.owner===u.id);
+        const uTotal=uTasks.length;
+        const uDone=uTasks.filter(t=>t.status==='done').length;
+        const uDoing=uTasks.filter(t=>t.status==='doing').length;
+        const uLate=uTasks.filter(this.late).length;
+        const uPct=uTotal?Math.round((uDone/uTotal)*100):0;
+        return {id:u.id,name:u.name,role:this.roleName(u.role),total:uTotal,done:uDone,doing:uDoing,late:uLate,pct:uPct};
+      })
+      .filter(u=>u.total>0);
+
+    const isMultiOrg=this.isPlatform&&(!this.companyFilter||this.companyFilter==='platform');
+    const orgRows=isMultiOrg
+      ? (this.s?.companies||[]).map(c=>{
+          const cTasks=tasks.filter(t=>t.company_id===c.id);
+          const cTotal=cTasks.length;
+          const cDone=cTasks.filter(t=>t.status==='done').length;
+          const cLate=cTasks.filter(this.late).length;
+          const cPct=cTotal?Math.round((cDone/cTotal)*100):0;
+          const cProjs=(this.s?.projects||[]).filter(p=>p.company===c.id).length;
+          return {id:c.id,name:c.name,projectsCount:cProjs,total:cTotal,done:cDone,late:cLate,pct:cPct};
+        })
+      : [];
+
+    let dashRowsXml='';
+
+    // Title banner
+    dashRowsXml+=`   <Row ss:Height="34">
+    <Cell ss:MergeAcross="7" ss:StyleID="DashTitle"><Data ss:Type="String">MERİDİAN — İDARƏETMƏ PANELİ VƏ İCRA DASHBOARDU</Data></Cell>
+   </Row>
+   <Row ss:Height="22">
+    <Cell ss:MergeAcross="7" ss:StyleID="DashSubtitle"><Data ss:Type="String">Qurum: ${esc(currentOrgTitle)}   |   Tarix: ${new Date().toLocaleDateString('az-AZ')} ${new Date().toLocaleTimeString('az-AZ',{hour:'2-digit',minute:'2-digit'})}   |   İstifadəçi: ${esc(this.s?.me?.name||'İstifadəçi')} (${esc(this.roleName(this.s?.me?.role))})</Data></Cell>
+   </Row>
+   <Row ss:Height="12"><Cell ss:StyleID="Default"/></Row>`;
+
+    // KPI Cards block
+    dashRowsXml+=`   <Row ss:Height="22">
+    <Cell ss:StyleID="CardTitle"><Data ss:Type="String">CƏMİ TAPŞIRIQ</Data></Cell>
+    <Cell ss:StyleID="CardTitle"><Data ss:Type="String">TAMAMLANIB</Data></Cell>
+    <Cell ss:StyleID="CardTitle"><Data ss:Type="String">İCRADADIR</Data></Cell>
+    <Cell ss:StyleID="CardTitle"><Data ss:Type="String">YOXLAMADA</Data></Cell>
+    <Cell ss:StyleID="CardTitle"><Data ss:Type="String">PLANLAŞDIRILIB</Data></Cell>
+    <Cell ss:StyleID="CardTitle"><Data ss:Type="String">GECİKƏN</Data></Cell>
+    <Cell ss:StyleID="CardTitle"><Data ss:Type="String">İCRA FAİZİ</Data></Cell>
+    <Cell ss:StyleID="CardTitle"><Data ss:Type="String">VAXTINDA İCRA</Data></Cell>
+   </Row>
+   <Row ss:Height="28">
+    <Cell ss:StyleID="CardValue"><Data ss:Type="Number">${total}</Data></Cell>
+    <Cell ss:StyleID="CardValueGreen"><Data ss:Type="String">${done} (${doneRate}%)</Data></Cell>
+    <Cell ss:StyleID="CardValueAmber"><Data ss:Type="Number">${doing}</Data></Cell>
+    <Cell ss:StyleID="CardValueBlue"><Data ss:Type="Number">${review}</Data></Cell>
+    <Cell ss:StyleID="CardValue"><Data ss:Type="Number">${todo}</Data></Cell>
+    <Cell ss:StyleID="${late?'CardValueRed':'CardValue'}"><Data ss:Type="Number">${late}</Data></Cell>
+    <Cell ss:StyleID="CardValueGreen"><Data ss:Type="String">${doneRate}%</Data></Cell>
+    <Cell ss:StyleID="CardValueGreen"><Data ss:Type="String">${onTimeRate}%</Data></Cell>
+   </Row>
+   <Row ss:Height="14"><Cell ss:StyleID="Default"/></Row>`;
+
+    // 1. Mərhələlər üzrə İcra Vəziyyəti
+    dashRowsXml+=`   <Row ss:Height="24">
+    <Cell ss:MergeAcross="7" ss:StyleID="SectionHeader"><Data ss:Type="String">1. MƏRHƏLƏLƏR ÜZRƏ İCRA VƏZİYYƏTİ</Data></Cell>
+   </Row>
+   <Row ss:Height="22">
+    <Cell ss:StyleID="TableHeader"><Data ss:Type="String">№</Data></Cell>
+    <Cell ss:MergeAcross="1" ss:StyleID="TableHeader"><Data ss:Type="String">Mərhələ / Status</Data></Cell>
+    <Cell ss:StyleID="TableHeader"><Data ss:Type="String">Tapşırıq Sayı</Data></Cell>
+    <Cell ss:StyleID="TableHeader"><Data ss:Type="String">Faiz Göstəricisi</Data></Cell>
+    <Cell ss:MergeAcross="1" ss:StyleID="TableHeader"><Data ss:Type="String">Vizuallaşdırma / Qrafik</Data></Cell>
+    <Cell ss:StyleID="TableHeader"><Data ss:Type="String">Vəziyyət</Data></Cell>
+   </Row>
+   <Row ss:Height="20">
+    <Cell ss:StyleID="CellCenter"><Data ss:Type="Number">1</Data></Cell>
+    <Cell ss:MergeAcross="1" ss:StyleID="CellTextBold"><Data ss:Type="String">Planlaşdırılıb (Todo)</Data></Cell>
+    <Cell ss:StyleID="CellCenter"><Data ss:Type="Number">${todo}</Data></Cell>
+    <Cell ss:StyleID="CellCenter"><Data ss:Type="String">${todoPct}%</Data></Cell>
+    <Cell ss:MergeAcross="1" ss:StyleID="CellBar"><Data ss:Type="String">${makeBar(todoPct)}</Data></Cell>
+    <Cell ss:StyleID="BadgeActive"><Data ss:Type="String">Növbədə</Data></Cell>
+   </Row>
+   <Row ss:Height="20">
+    <Cell ss:StyleID="CellCenter"><Data ss:Type="Number">2</Data></Cell>
+    <Cell ss:MergeAcross="1" ss:StyleID="CellTextBold"><Data ss:Type="String">İcradadır (Doing)</Data></Cell>
+    <Cell ss:StyleID="CellCenter"><Data ss:Type="Number">${doing}</Data></Cell>
+    <Cell ss:StyleID="CellCenter"><Data ss:Type="String">${doingPct}%</Data></Cell>
+    <Cell ss:MergeAcross="1" ss:StyleID="CellBar"><Data ss:Type="String">${makeBar(doingPct)}</Data></Cell>
+    <Cell ss:StyleID="BadgeActive"><Data ss:Type="String">Aktiv icra</Data></Cell>
+   </Row>
+   <Row ss:Height="20">
+    <Cell ss:StyleID="CellCenter"><Data ss:Type="Number">3</Data></Cell>
+    <Cell ss:MergeAcross="1" ss:StyleID="CellTextBold"><Data ss:Type="String">Yoxlamada (Review)</Data></Cell>
+    <Cell ss:StyleID="CellCenter"><Data ss:Type="Number">${review}</Data></Cell>
+    <Cell ss:StyleID="CellCenter"><Data ss:Type="String">${reviewPct}%</Data></Cell>
+    <Cell ss:MergeAcross="1" ss:StyleID="CellBar"><Data ss:Type="String">${makeBar(reviewPct)}</Data></Cell>
+    <Cell ss:StyleID="BadgeActive"><Data ss:Type="String">Yoxlanılır</Data></Cell>
+   </Row>
+   <Row ss:Height="20">
+    <Cell ss:StyleID="CellCenter"><Data ss:Type="Number">4</Data></Cell>
+    <Cell ss:MergeAcross="1" ss:StyleID="CellTextBold"><Data ss:Type="String">Tamamlanıb (Done)</Data></Cell>
+    <Cell ss:StyleID="CellCenter"><Data ss:Type="Number">${done}</Data></Cell>
+    <Cell ss:StyleID="CellCenter"><Data ss:Type="String">${donePct}%</Data></Cell>
+    <Cell ss:MergeAcross="1" ss:StyleID="CellBar"><Data ss:Type="String">${makeBar(donePct)}</Data></Cell>
+    <Cell ss:StyleID="BadgeDone"><Data ss:Type="String">Uğurla icra</Data></Cell>
+   </Row>
+   <Row ss:Height="22">
+    <Cell ss:StyleID="TableTotalCenter"><Data ss:Type="String">—</Data></Cell>
+    <Cell ss:MergeAcross="1" ss:StyleID="TableTotal"><Data ss:Type="String">CƏMİ</Data></Cell>
+    <Cell ss:StyleID="TableTotalCenter"><Data ss:Type="Number">${total}</Data></Cell>
+    <Cell ss:StyleID="TableTotalCenter"><Data ss:Type="String">100%</Data></Cell>
+    <Cell ss:MergeAcross="1" ss:StyleID="TableTotalCenter"><Data ss:Type="String">${total?'██████████ 100%':'—'}</Data></Cell>
+    <Cell ss:StyleID="TableTotalCenter"><Data ss:Type="String">${doneRate}% İcra</Data></Cell>
+   </Row>
+   <Row ss:Height="14"><Cell ss:StyleID="Default"/></Row>`;
+
+    // 2. Prioritetlər üzrə Bölgü
+    dashRowsXml+=`   <Row ss:Height="24">
+    <Cell ss:MergeAcross="7" ss:StyleID="SectionHeader"><Data ss:Type="String">2. PRİORİTETLƏR ÜZRƏ BÖLGÜ</Data></Cell>
+   </Row>
+   <Row ss:Height="22">
+    <Cell ss:StyleID="TableHeader"><Data ss:Type="String">№</Data></Cell>
+    <Cell ss:MergeAcross="1" ss:StyleID="TableHeader"><Data ss:Type="String">Prioritet Dərəcəsi</Data></Cell>
+    <Cell ss:StyleID="TableHeader"><Data ss:Type="String">Tapşırıq Sayı</Data></Cell>
+    <Cell ss:StyleID="TableHeader"><Data ss:Type="String">Xüsusi Çəki (%)</Data></Cell>
+    <Cell ss:MergeAcross="1" ss:StyleID="TableHeader"><Data ss:Type="String">Vizuallaşdırma</Data></Cell>
+    <Cell ss:StyleID="TableHeader"><Data ss:Type="String">Əhəmiyyət Dərəcəsi</Data></Cell>
+   </Row>
+   <Row ss:Height="20">
+    <Cell ss:StyleID="CellCenter"><Data ss:Type="Number">1</Data></Cell>
+    <Cell ss:MergeAcross="1" ss:StyleID="CellTextBold"><Data ss:Type="String">Yüksək (High)</Data></Cell>
+    <Cell ss:StyleID="CellCenter"><Data ss:Type="Number">${high}</Data></Cell>
+    <Cell ss:StyleID="CellCenter"><Data ss:Type="String">${highPct}%</Data></Cell>
+    <Cell ss:MergeAcross="1" ss:StyleID="CellBar"><Data ss:Type="String">${makeBar(highPct)}</Data></Cell>
+    <Cell ss:StyleID="BadgeLate"><Data ss:Type="String">Təcili / Kritik</Data></Cell>
+   </Row>
+   <Row ss:Height="20">
+    <Cell ss:StyleID="CellCenter"><Data ss:Type="Number">2</Data></Cell>
+    <Cell ss:MergeAcross="1" ss:StyleID="CellTextBold"><Data ss:Type="String">Orta (Normal)</Data></Cell>
+    <Cell ss:StyleID="CellCenter"><Data ss:Type="Number">${normal}</Data></Cell>
+    <Cell ss:StyleID="CellCenter"><Data ss:Type="String">${normalPct}%</Data></Cell>
+    <Cell ss:MergeAcross="1" ss:StyleID="CellBar"><Data ss:Type="String">${makeBar(normalPct)}</Data></Cell>
+    <Cell ss:StyleID="BadgeActive"><Data ss:Type="String">Standart Plan</Data></Cell>
+   </Row>
+   <Row ss:Height="20">
+    <Cell ss:StyleID="CellCenter"><Data ss:Type="Number">3</Data></Cell>
+    <Cell ss:MergeAcross="1" ss:StyleID="CellTextBold"><Data ss:Type="String">Aşağı (Low)</Data></Cell>
+    <Cell ss:StyleID="CellCenter"><Data ss:Type="Number">${low}</Data></Cell>
+    <Cell ss:StyleID="CellCenter"><Data ss:Type="String">${lowPct}%</Data></Cell>
+    <Cell ss:MergeAcross="1" ss:StyleID="CellBar"><Data ss:Type="String">${makeBar(lowPct)}</Data></Cell>
+    <Cell ss:StyleID="CellCenter"><Data ss:Type="String">Planlı fəaliyyət</Data></Cell>
+   </Row>
+   <Row ss:Height="22">
+    <Cell ss:StyleID="TableTotalCenter"><Data ss:Type="String">—</Data></Cell>
+    <Cell ss:MergeAcross="1" ss:StyleID="TableTotal"><Data ss:Type="String">CƏMİ</Data></Cell>
+    <Cell ss:StyleID="TableTotalCenter"><Data ss:Type="Number">${total}</Data></Cell>
+    <Cell ss:StyleID="TableTotalCenter"><Data ss:Type="String">100%</Data></Cell>
+    <Cell ss:MergeAcross="1" ss:StyleID="TableTotalCenter"><Data ss:Type="String">${total?'██████████ 100%':'—'}</Data></Cell>
+    <Cell ss:StyleID="TableTotalCenter"><Data ss:Type="String">—</Data></Cell>
+   </Row>
+   <Row ss:Height="14"><Cell ss:StyleID="Default"/></Row>`;
+
+    // 3. Layihələr üzrə İcra və Gedişat
+    dashRowsXml+=`   <Row ss:Height="24">
+    <Cell ss:MergeAcross="7" ss:StyleID="SectionHeader"><Data ss:Type="String">3. LAYİHƏLƏR ÜZRƏ İCRA VƏ GECİKMƏ GÖSTƏRİCİLƏRİ</Data></Cell>
+   </Row>
+   <Row ss:Height="22">
+    <Cell ss:StyleID="TableHeader"><Data ss:Type="String">№</Data></Cell>
+    <Cell ss:StyleID="TableHeader"><Data ss:Type="String">Layihənin Adı</Data></Cell>
+    <Cell ss:StyleID="TableHeader"><Data ss:Type="String">Cəmi</Data></Cell>
+    <Cell ss:StyleID="TableHeader"><Data ss:Type="String">Tamamlanıb</Data></Cell>
+    <Cell ss:StyleID="TableHeader"><Data ss:Type="String">İcradadır</Data></Cell>
+    <Cell ss:StyleID="TableHeader"><Data ss:Type="String">Gecikən</Data></Cell>
+    <Cell ss:StyleID="TableHeader"><Data ss:Type="String">İcra Faizi</Data></Cell>
+    <Cell ss:StyleID="TableHeader"><Data ss:Type="String">Status</Data></Cell>
+   </Row>`;
+
+    if(projectRows.length){
+      projectRows.forEach((p, idx)=>{
+        const statusBadge = p.late ? 'BadgeLate' : (p.pct >= 80 ? 'BadgeDone' : 'BadgeActive');
+        const statusText = p.late ? `! ${p.late} gecikir` : (p.pct >= 80 ? 'Tamamlanır' : (p.pct > 0 ? 'Aktiv icrada' : 'Başlanğıc'));
+        dashRowsXml+=`   <Row ss:Height="20">
+    <Cell ss:StyleID="CellCenter"><Data ss:Type="Number">${idx+1}</Data></Cell>
+    <Cell ss:StyleID="CellTextBold"><Data ss:Type="String">${esc(p.name)}</Data></Cell>
+    <Cell ss:StyleID="CellCenter"><Data ss:Type="Number">${p.total}</Data></Cell>
+    <Cell ss:StyleID="CellCenter"><Data ss:Type="Number">${p.done}</Data></Cell>
+    <Cell ss:StyleID="CellCenter"><Data ss:Type="Number">${p.doing}</Data></Cell>
+    <Cell ss:StyleID="${p.late ? 'BadgeLate' : 'CellCenter'}"><Data ss:Type="Number">${p.late}</Data></Cell>
+    <Cell ss:StyleID="CellCenterBold"><Data ss:Type="String">${p.pct}%</Data></Cell>
+    <Cell ss:StyleID="${statusBadge}"><Data ss:Type="String">${statusText}</Data></Cell>
+   </Row>`;
+      });
+    } else {
+      dashRowsXml+=`   <Row ss:Height="20">
+    <Cell ss:MergeAcross="7" ss:StyleID="CellCenter"><Data ss:Type="String">Heç bir layihə tapılmadı.</Data></Cell>
+   </Row>`;
+    }
+    dashRowsXml+=`   <Row ss:Height="14"><Cell ss:StyleID="Default"/></Row>`;
+
+    // 4. Komanda üzvlərinin yüklənməsi (if userRows.length)
+    if(userRows.length && (this.admin || this.isPlatform)){
+      dashRowsXml+=`   <Row ss:Height="24">
+    <Cell ss:MergeAcross="7" ss:StyleID="SectionHeader"><Data ss:Type="String">4. KOMANDA ÜZVLƏRİNİN YÜKLƏNMƏSİ VƏ MƏHSULDARLIĞI</Data></Cell>
+   </Row>
+   <Row ss:Height="22">
+    <Cell ss:StyleID="TableHeader"><Data ss:Type="String">№</Data></Cell>
+    <Cell ss:StyleID="TableHeader"><Data ss:Type="String">Əməkdaş / İcraçı</Data></Cell>
+    <Cell ss:StyleID="TableHeader"><Data ss:Type="String">Vəzifə / Rol</Data></Cell>
+    <Cell ss:StyleID="TableHeader"><Data ss:Type="String">Təhkim Edilib</Data></Cell>
+    <Cell ss:StyleID="TableHeader"><Data ss:Type="String">Tamamlanıb</Data></Cell>
+    <Cell ss:StyleID="TableHeader"><Data ss:Type="String">Aktiv İcrada</Data></Cell>
+    <Cell ss:StyleID="TableHeader"><Data ss:Type="String">Gecikən</Data></Cell>
+    <Cell ss:StyleID="TableHeader"><Data ss:Type="String">Məhsuldarlıq</Data></Cell>
+   </Row>`;
+      userRows.forEach((u, idx)=>{
+        dashRowsXml+=`   <Row ss:Height="20">
+    <Cell ss:StyleID="CellCenter"><Data ss:Type="Number">${idx+1}</Data></Cell>
+    <Cell ss:StyleID="CellTextBold"><Data ss:Type="String">${esc(u.name)}</Data></Cell>
+    <Cell ss:StyleID="CellText"><Data ss:Type="String">${esc(u.role)}</Data></Cell>
+    <Cell ss:StyleID="CellCenter"><Data ss:Type="Number">${u.total}</Data></Cell>
+    <Cell ss:StyleID="CellCenter"><Data ss:Type="Number">${u.done}</Data></Cell>
+    <Cell ss:StyleID="CellCenter"><Data ss:Type="Number">${u.doing}</Data></Cell>
+    <Cell ss:StyleID="${u.late ? 'BadgeLate' : 'CellCenter'}"><Data ss:Type="Number">${u.late}</Data></Cell>
+    <Cell ss:StyleID="CellCenterBold"><Data ss:Type="String">${u.pct}%</Data></Cell>
+   </Row>`;
+      });
+      dashRowsXml+=`   <Row ss:Height="14"><Cell ss:StyleID="Default"/></Row>`;
+    }
+
+    // 5. Qurumlar üzrə İcmal (if isMultiOrg)
+    if(orgRows.length){
+      dashRowsXml+=`   <Row ss:Height="24">
+    <Cell ss:MergeAcross="7" ss:StyleID="SectionHeader"><Data ss:Type="String">5. QURUMLAR / TƏŞKİLATLAR ÜZRƏ İCMAL</Data></Cell>
+   </Row>
+   <Row ss:Height="22">
+    <Cell ss:StyleID="TableHeader"><Data ss:Type="String">№</Data></Cell>
+    <Cell ss:MergeAcross="1" ss:StyleID="TableHeader"><Data ss:Type="String">Qurum / Təşkilat Adı</Data></Cell>
+    <Cell ss:StyleID="TableHeader"><Data ss:Type="String">Layihələr</Data></Cell>
+    <Cell ss:StyleID="TableHeader"><Data ss:Type="String">Cəmi Tapşırıq</Data></Cell>
+    <Cell ss:StyleID="TableHeader"><Data ss:Type="String">Tamamlanıb</Data></Cell>
+    <Cell ss:StyleID="TableHeader"><Data ss:Type="String">Gecikən</Data></Cell>
+    <Cell ss:StyleID="TableHeader"><Data ss:Type="String">İcra Faizi</Data></Cell>
+   </Row>`;
+      orgRows.forEach((c, idx)=>{
+        dashRowsXml+=`   <Row ss:Height="20">
+    <Cell ss:StyleID="CellCenter"><Data ss:Type="Number">${idx+1}</Data></Cell>
+    <Cell ss:MergeAcross="1" ss:StyleID="CellTextBold"><Data ss:Type="String">${esc(c.name)}</Data></Cell>
+    <Cell ss:StyleID="CellCenter"><Data ss:Type="Number">${c.projectsCount}</Data></Cell>
+    <Cell ss:StyleID="CellCenter"><Data ss:Type="Number">${c.total}</Data></Cell>
+    <Cell ss:StyleID="CellCenter"><Data ss:Type="Number">${c.done}</Data></Cell>
+    <Cell ss:StyleID="${c.late ? 'BadgeLate' : 'CellCenter'}"><Data ss:Type="Number">${c.late}</Data></Cell>
+    <Cell ss:StyleID="CellCenterBold"><Data ss:Type="String">${c.pct}%</Data></Cell>
+   </Row>`;
+      });
+      dashRowsXml+=`   <Row ss:Height="14"><Cell ss:StyleID="Default"/></Row>`;
+    }
+
+    // Detailed task rows for Sheet 2
     const rowsXml=tasks.map(t=>{
       const st=this.statuses[t.status]||t.status;
       const pr=this.priorities[t.priority]||t.priority;
       const proj=this.projectName(t.project)||'—';
       const owner=this.person(t.owner);
+      const isLate=this.late(t);
+      const statusBadge = isLate ? 'BadgeLate' : (t.status === 'done' ? 'BadgeDone' : 'CellCenter');
+      const statusLabel = isLate ? 'Gecikib' : (t.status === 'done' ? 'Tamamlanıb' : (t.status === 'doing' ? 'İcradadır' : (t.status === 'review' ? 'Yoxlamada' : 'Planlaşdırılıb')));
       const orgCell=this.isPlatform ? `\n    <Cell ss:StyleID="CellText"><Data ss:Type="String">${esc(t.company_name || this.companyName(t.company_id))}</Data></Cell>` : '';
       return `   <Row ss:Height="22">
     <Cell ss:StyleID="CellCenter"><Data ss:Type="Number">${t.id}</Data></Cell>${orgCell}
@@ -683,7 +995,8 @@ const app=createApp({
     <Cell ss:StyleID="CellText"><Data ss:Type="String">${esc(owner)}</Data></Cell>
     <Cell ss:StyleID="CellCenter"><Data ss:Type="String">${esc(st)}</Data></Cell>
     <Cell ss:StyleID="CellCenter"><Data ss:Type="String">${esc(pr)}</Data></Cell>
-    <Cell ss:StyleID="CellCenter"><Data ss:Type="String">${esc(t.due||'Tarixsiz')}</Data></Cell>
+    <Cell ss:StyleID="${isLate ? 'BadgeLate' : 'CellCenter'}"><Data ss:Type="String">${esc(t.due||'Tarixsiz')}</Data></Cell>
+    <Cell ss:StyleID="${statusBadge}"><Data ss:Type="String">${statusLabel}</Data></Cell>
    </Row>`;
     }).join('\n');
 
@@ -695,7 +1008,9 @@ const app=createApp({
  xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"
  xmlns:html="http://www.w3.org/TR/REC-html40">
  <DocumentProperties xmlns="urn:schemas-microsoft-com:office:office">
-  <Title>Meridian Tapşırıqlar Hesabatı</Title>
+  <Title>Meridian İdarəetmə Paneli və Hesabat</Title>
+  <Subject>Tapşırıqların icra hesabatı və analitik dashboard</Subject>
+  <Author>Meridian Workspace</Author>
   <Created>${new Date().toISOString()}</Created>
  </DocumentProperties>
  <Styles>
@@ -707,6 +1022,93 @@ const app=createApp({
    <NumberFormat/>
    <Protection/>
   </Style>
+  <Style ss:ID="DashTitle">
+   <Alignment ss:Horizontal="Center" ss:Vertical="Center"/>
+   <Font ss:FontName="Segoe UI" ss:Size="14" ss:Bold="1" ss:Color="#FFFFFF"/>
+   <Interior ss:Color="#14452B" ss:Pattern="Solid"/>
+  </Style>
+  <Style ss:ID="DashSubtitle">
+   <Alignment ss:Horizontal="Center" ss:Vertical="Center"/>
+   <Font ss:FontName="Segoe UI" ss:Size="9" ss:Italic="1" ss:Color="#2D3748"/>
+   <Interior ss:Color="#EAF2EC" ss:Pattern="Solid"/>
+  </Style>
+  <Style ss:ID="SectionHeader">
+   <Alignment ss:Horizontal="Left" ss:Vertical="Center"/>
+   <Borders>
+    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="2" ss:Color="#14452B"/>
+   </Borders>
+   <Font ss:FontName="Segoe UI" ss:Size="11" ss:Bold="1" ss:Color="#FFFFFF"/>
+   <Interior ss:Color="#205E3B" ss:Pattern="Solid"/>
+  </Style>
+  <Style ss:ID="CardTitle">
+   <Alignment ss:Horizontal="Center" ss:Vertical="Center"/>
+   <Borders>
+    <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#CBD5E0"/>
+    <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#CBD5E0"/>
+    <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#CBD5E0"/>
+    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#CBD5E0"/>
+   </Borders>
+   <Font ss:FontName="Segoe UI" ss:Size="9" ss:Bold="1" ss:Color="#4A5568"/>
+   <Interior ss:Color="#EDF2F7" ss:Pattern="Solid"/>
+  </Style>
+  <Style ss:ID="CardValue">
+   <Alignment ss:Horizontal="Center" ss:Vertical="Center"/>
+   <Borders>
+    <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#CBD5E0"/>
+    <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#CBD5E0"/>
+    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="2" ss:Color="#CBD5E0"/>
+   </Borders>
+   <Font ss:FontName="Segoe UI" ss:Size="13" ss:Bold="1" ss:Color="#1A202C"/>
+   <Interior ss:Color="#F7FAFC" ss:Pattern="Solid"/>
+  </Style>
+  <Style ss:ID="CardValueGreen">
+   <Alignment ss:Horizontal="Center" ss:Vertical="Center"/>
+   <Borders>
+    <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#9AE6B4"/>
+    <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#9AE6B4"/>
+    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="2" ss:Color="#38A169"/>
+   </Borders>
+   <Font ss:FontName="Segoe UI" ss:Size="13" ss:Bold="1" ss:Color="#22543D"/>
+   <Interior ss:Color="#C6F6D5" ss:Pattern="Solid"/>
+  </Style>
+  <Style ss:ID="CardValueAmber">
+   <Alignment ss:Horizontal="Center" ss:Vertical="Center"/>
+   <Borders>
+    <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#FBD38D"/>
+    <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#FBD38D"/>
+    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="2" ss:Color="#DD6B20"/>
+   </Borders>
+   <Font ss:FontName="Segoe UI" ss:Size="13" ss:Bold="1" ss:Color="#7B341E"/>
+   <Interior ss:Color="#FEEBC8" ss:Pattern="Solid"/>
+  </Style>
+  <Style ss:ID="CardValueBlue">
+   <Alignment ss:Horizontal="Center" ss:Vertical="Center"/>
+   <Borders>
+    <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#90CDF4"/>
+    <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#90CDF4"/>
+    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="2" ss:Color="#3182CE"/>
+   </Borders>
+   <Font ss:FontName="Segoe UI" ss:Size="13" ss:Bold="1" ss:Color="#2A4365"/>
+   <Interior ss:Color="#BEE3F8" ss:Pattern="Solid"/>
+  </Style>
+  <Style ss:ID="CardValueRed">
+   <Alignment ss:Horizontal="Center" ss:Vertical="Center"/>
+   <Borders>
+    <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#FEB2B2"/>
+    <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#FEB2B2"/>
+    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="2" ss:Color="#E53E3E"/>
+   </Borders>
+   <Font ss:FontName="Segoe UI" ss:Size="13" ss:Bold="1" ss:Color="#742A2A"/>
+   <Interior ss:Color="#FED7D7" ss:Pattern="Solid"/>
+  </Style>
+  <Style ss:ID="TableHeader">
+   <Alignment ss:Horizontal="Center" ss:Vertical="Center"/>
+   <Borders>
+    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="2" ss:Color="#1A202C"/>
+   </Borders>
+   <Font ss:FontName="Segoe UI" ss:Size="10" ss:Bold="1" ss:Color="#FFFFFF"/>
+   <Interior ss:Color="#2D3748" ss:Pattern="Solid"/>
+  </Style>
   <Style ss:ID="Header">
    <Alignment ss:Horizontal="Center" ss:Vertical="Center"/>
    <Borders>
@@ -715,12 +1117,37 @@ const app=createApp({
    <Font ss:FontName="Segoe UI" ss:Size="11" ss:Bold="1" ss:Color="#FFFFFF"/>
    <Interior ss:Color="#14452B" ss:Pattern="Solid"/>
   </Style>
+  <Style ss:ID="TableTotal">
+   <Alignment ss:Vertical="Center"/>
+   <Borders>
+    <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#CBD5E0"/>
+    <Border ss:Position="Bottom" ss:LineStyle="Double" ss:Weight="3" ss:Color="#1A202C"/>
+   </Borders>
+   <Font ss:FontName="Segoe UI" ss:Size="10" ss:Bold="1" ss:Color="#1A202C"/>
+   <Interior ss:Color="#EDF2F7" ss:Pattern="Solid"/>
+  </Style>
+  <Style ss:ID="TableTotalCenter">
+   <Alignment ss:Horizontal="Center" ss:Vertical="Center"/>
+   <Borders>
+    <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#CBD5E0"/>
+    <Border ss:Position="Bottom" ss:LineStyle="Double" ss:Weight="3" ss:Color="#1A202C"/>
+   </Borders>
+   <Font ss:FontName="Segoe UI" ss:Size="10" ss:Bold="1" ss:Color="#1A202C"/>
+   <Interior ss:Color="#EDF2F7" ss:Pattern="Solid"/>
+  </Style>
   <Style ss:ID="CellText">
    <Alignment ss:Vertical="Center"/>
    <Borders>
     <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#E2E8F0"/>
    </Borders>
    <Font ss:FontName="Segoe UI" ss:Size="10"/>
+  </Style>
+  <Style ss:ID="CellTextBold">
+   <Alignment ss:Vertical="Center"/>
+   <Borders>
+    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#E2E8F0"/>
+   </Borders>
+   <Font ss:FontName="Segoe UI" ss:Size="10" ss:Bold="1"/>
   </Style>
   <Style ss:ID="CellCenter">
    <Alignment ss:Horizontal="Center" ss:Vertical="Center"/>
@@ -729,7 +1156,58 @@ const app=createApp({
    </Borders>
    <Font ss:FontName="Segoe UI" ss:Size="10"/>
   </Style>
+  <Style ss:ID="CellCenterBold">
+   <Alignment ss:Horizontal="Center" ss:Vertical="Center"/>
+   <Borders>
+    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#E2E8F0"/>
+   </Borders>
+   <Font ss:FontName="Segoe UI" ss:Size="10" ss:Bold="1"/>
+  </Style>
+  <Style ss:ID="CellBar">
+   <Alignment ss:Horizontal="Left" ss:Vertical="Center"/>
+   <Borders>
+    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#E2E8F0"/>
+   </Borders>
+   <Font ss:FontName="Consolas" ss:Size="9" ss:Color="#2F855A"/>
+  </Style>
+  <Style ss:ID="BadgeLate">
+   <Alignment ss:Horizontal="Center" ss:Vertical="Center"/>
+   <Borders>
+    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#FEB2B2"/>
+   </Borders>
+   <Font ss:FontName="Segoe UI" ss:Size="9" ss:Bold="1" ss:Color="#9B2C2C"/>
+   <Interior ss:Color="#FFF5F5" ss:Pattern="Solid"/>
+  </Style>
+  <Style ss:ID="BadgeDone">
+   <Alignment ss:Horizontal="Center" ss:Vertical="Center"/>
+   <Borders>
+    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#9AE6B4"/>
+   </Borders>
+   <Font ss:FontName="Segoe UI" ss:Size="9" ss:Bold="1" ss:Color="#22543D"/>
+   <Interior ss:Color="#F0FFF4" ss:Pattern="Solid"/>
+  </Style>
+  <Style ss:ID="BadgeActive">
+   <Alignment ss:Horizontal="Center" ss:Vertical="Center"/>
+   <Borders>
+    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#BEE3F8"/>
+   </Borders>
+   <Font ss:FontName="Segoe UI" ss:Size="9" ss:Bold="1" ss:Color="#2B6CB0"/>
+   <Interior ss:Color="#EBF8FF" ss:Pattern="Solid"/>
+  </Style>
  </Styles>
+ <Worksheet ss:Name="İdarəetmə Paneli">
+  <Table>
+   <Column ss:Width="40"/>
+   <Column ss:Width="170"/>
+   <Column ss:Width="95"/>
+   <Column ss:Width="95"/>
+   <Column ss:Width="95"/>
+   <Column ss:Width="95"/>
+   <Column ss:Width="95"/>
+   <Column ss:Width="125"/>
+${dashRowsXml}
+  </Table>
+ </Worksheet>
  <Worksheet ss:Name="Tapşırıqlar">
   <Table>
    <Column ss:Width="45"/>
@@ -741,6 +1219,7 @@ const app=createApp({
    <Column ss:Width="105"/>
    <Column ss:Width="95"/>
    <Column ss:Width="95"/>
+   <Column ss:Width="110"/>
    <Row ss:Height="28">
     <Cell ss:StyleID="Header"><Data ss:Type="String">№</Data></Cell>
     ${this.isPlatform ? '<Cell ss:StyleID="Header"><Data ss:Type="String">Qurum</Data></Cell>' : ''}
@@ -751,6 +1230,7 @@ const app=createApp({
     <Cell ss:StyleID="Header"><Data ss:Type="String">Mərhələ</Data></Cell>
     <Cell ss:StyleID="Header"><Data ss:Type="String">Prioritet</Data></Cell>
     <Cell ss:StyleID="Header"><Data ss:Type="String">Son tarix</Data></Cell>
+    <Cell ss:StyleID="Header"><Data ss:Type="String">Vəziyyət</Data></Cell>
    </Row>
 ${rowsXml}
   </Table>
@@ -762,7 +1242,7 @@ ${rowsXml}
     const a=document.createElement('a');
     a.href=url;
     const compPart=(this.isPlatform&&this.companyFilter&&this.companyFilter!=='platform')?('-'+this.companyName(this.companyFilter)):(this.isPlatform?'-Platforma':'');
-    a.download=(this.isPlatform?('Meridian'+compPart+'-Hesabat'):(this.admin?'Meridian-Tapshiriqlar':'Meridian-Ferdi-Hesabat'))+'-'+this.todayDateStr+'.xls';
+    a.download=(this.isPlatform?('Meridian'+compPart+'-Dashboard-Hesabat'):(this.admin?'Meridian-Dashboard-Hesabat':'Meridian-Ferdi-Dashboard-Hesabat'))+'-'+this.todayDateStr+'.xls';
     a.click();
     setTimeout(()=>URL.revokeObjectURL(url),1000);
   },
