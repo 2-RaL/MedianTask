@@ -39,7 +39,13 @@ const app=createApp({
     }[this.page];
   },
   today(){return new Date().toLocaleDateString('az-AZ',{weekday:'long',day:'numeric',month:'long'})},
-  team(){return this.s.users.filter(u=>!this.isPlatform||!this.companyFilter||u.company===this.companyFilter)},
+  team(){
+    return this.s.users.filter(u=>{
+      if(!this.isPlatform||!this.companyFilter)return true;
+      if(this.companyFilter==='platform')return u.role==='platform';
+      return u.company===Number(this.companyFilter);
+    });
+  },
   filtered(){return this.baseTasks.filter(t=>(!this.project||t.project===this.project)&&(!this.priority||t.priority===this.priority)&&(!this.query||t.title.toLocaleLowerCase('az').includes(this.query.trim().toLocaleLowerCase('az'))))},
   baseTasks(){return this.s.tasks.filter(t=>this.page!=='mine'||t.owner===this.s.me.id)},
   reportTasks(){
@@ -130,7 +136,12 @@ const app=createApp({
   platformMetrics(){return [['Şirkətlər',this.s.companies.length,'company'],['Aktiv hesablar',this.s.users.filter(u=>u.active).length,'team'],['Paketlər',this.s.plans.length,'box'],['Boş yerlər',this.s.companies.reduce((n,c)=>n+c.seats-c.used,0),'grid']]},
   current(){return this.s?.tasks?.find(t=>t.id===this.form.id)},
   actionLabel(){if(this.page==='reports')return 'CSV yüklə';if(!this.admin&&!this.isPlatform)return '';return {board:'Yeni tapşırıq',mine:'Yeni tapşırıq',team:'İstifadəçi əlavə et',companies:'Şirkət əlavə et',plans:'Yeni paket'}[this.page]},
-  modalTitle(){if(this.modal==='importUsers')return 'Excel ilə toplu əlavə et';return this.modal==='detail'?this.current?.title:this.modal==='deleteTask'?'Tapşırıq silinsin?':({task:'Tapşırıq',plan:'Paket',company:'Şirkət',user:'İstifadəçi',project:'Layihə'}[this.modal]||'')+(this.form.id?' · redaktə':' · əlavə et')}
+  modalTitle(){
+    if(this.modal==='importUsers')return 'Excel ilə toplu əlavə et';
+    if(this.modal==='deleteUser')return 'İstifadəçi silinsin?';
+    if(this.modal==='deleteTask')return 'Tapşırıq silinsin?';
+    return this.modal==='detail'?this.current?.title:({task:'Tapşırıq',plan:'Paket',company:'Şirkət',user:'İstifadəçi',project:'Layihə'}[this.modal]||'')+(this.form.id?' · redaktə':' · əlavə et');
+  }
  },
  async mounted(){
   try{this.demo=(await this.api('info')).demo;await this.restore()}catch(e){if(e.status!==401)this.error=e.message}finally{this.ready=true}
@@ -161,9 +172,25 @@ const app=createApp({
   late(t){const d=new Date();d.setHours(0,0,0,0);return !!t.due&&t.status!=='done'&&new Date(t.due+'T00:00:00')<d},
   percent(id){const t=this.s.tasks.filter(t=>t.project===id);return t.length?Math.round(100*t.filter(t=>t.status==='done').length/t.length):0},
   notify(msg){this.toast=msg;clearTimeout(this.timer);this.timer=setTimeout(()=>this.toast='',3200)},
-  primaryAction(){if(this.page==='reports')return this.csv();if(['board','mine'].includes(this.page))return this.newTask('todo');if(this.page==='team'&&this.isPlatform&&!this.s.companies.length){this.notify('Əvvəlcə şirkət əlavə edin.');return this.open('company')}this.open({plans:'plan',companies:'company',team:'user'}[this.page])},
+  primaryAction(){if(this.page==='reports')return this.csv();if(['board','mine'].includes(this.page))return this.newTask('todo');this.open({plans:'plan',companies:'company',team:'user'}[this.page])},
   newTask(status){if(!this.s.projects.length){this.notify('İlk tapşırıq üçün layihə yaradın.');return this.open('project')}this.open('task',{status})},
-  open(type,data={}){this.mobile=false;this.error='';this.note='';this.modal=type;this.form={status:'todo',priority:'normal',project:this.project||this.s.projects?.[0]?.id,owner:this.page==='mine'?this.s.me.id:'',plan:this.s.plans?.[0]?.id,company:this.companyFilter||this.s.companies?.[0]?.id,role:'member',seats:10,monthly:0,cap:'',...data,active:data.active!==0};if(!this.$refs.dialog.open)this.$refs.dialog.showModal()},
+  open(type,data={}){
+    this.mobile=false;this.error='';this.note='';this.modal=type;
+    const initialCompany=(data.company!==undefined&&data.company!==null)?data.company:(this.companyFilter&&this.companyFilter!=='platform'?Number(this.companyFilter):(this.s.companies?.[0]?.id||''));
+    this.form={
+      status:'todo',
+      priority:'normal',
+      project:this.project||this.s.projects?.[0]?.id,
+      owner:this.page==='mine'?this.s.me.id:'',
+      plan:this.s.plans?.[0]?.id,
+      company:initialCompany,
+      role:data.role||(this.isPlatform?'platform':'member'),
+      seats:10,monthly:0,cap:'',
+      ...data,
+      active:data.active!==0
+    };
+    if(!this.$refs.dialog.open)this.$refs.dialog.showModal();
+  },
   close(){this.$refs.dialog?.close();this.modal='';this.error=''},detail(t){this.open('detail',t)},
   async mutate(type,payload,after){if(this.busy)return;this.busy=true;this.error='';try{await this.api(type,payload);this.s=await this.api('state');after?.();this.notify('Dəyişiklik yadda saxlanıldı.')}catch(e){this.error=e.message;if(!this.modal)this.notify(e.message);if(e.status===409){try{this.s=await this.api('state')}catch{}}}finally{this.busy=false}},
   save(){this.mutate(this.modal,this.form,()=>this.close())},comment(){this.mutate('comment',{id:this.form.id,body:this.note},()=>this.note='')},

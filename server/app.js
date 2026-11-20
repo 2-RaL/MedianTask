@@ -98,7 +98,7 @@ function task(id,c){return one('SELECT t.* FROM tasks t JOIN projects p ON t.pro
 function staff(u){if(u.role!=='admin')fail('Şirkət administratorunun icazəsi tələb olunur.',403);}
 function platform(u){if(u.role!=='platform')fail('Platforma administratorunun icazəsi tələb olunur.',403);}
 function state(u){
-  if(u.role==='platform')return {me:u,plans:all('SELECT * FROM plans ORDER BY id'),companies:all(companySQL+' ORDER BY c.id'),users:all('SELECT '+publicUser+' FROM users WHERE company IS NOT NULL')};
+  if(u.role==='platform')return {me:u,plans:all('SELECT * FROM plans ORDER BY id'),companies:all(companySQL+' ORDER BY c.id'),users:all('SELECT '+publicUser+' FROM users ORDER BY id')};
   const c=u.company;
   return {me:u,company:company(c),users:all('SELECT '+publicUser+' FROM users WHERE company=?',c),projects:all('SELECT * FROM projects WHERE company=?',c),tasks:all('SELECT t.* FROM tasks t JOIN projects p ON p.id=t.project WHERE p.company=? ORDER BY t.id',c),comments:all('SELECT m.* FROM comments m JOIN tasks t ON t.id=m.task JOIN projects p ON p.id=t.project WHERE p.company=? ORDER BY m.id',c)};
 }
@@ -123,18 +123,43 @@ function change(action,b,u){
     }
     case 'user':{
       if(u.role!=='platform')staff(u);
-      const c=company(u.role==='platform'?Number(b.company):u.company);
-      const old=b.id&&one('SELECT * FROM users WHERE id=? AND company=?',b.id,c.id);
-      if(b.id&&!old)fail('İstifadəçi tapılmadı.',404);
-      const active=b.active===false?0:1,role=choose(b.role,['admin','member']);
-      if((!old||!old.active)&&active&&c.used>=c.seats)fail('Şirkətin istifadəçi limiti dolub.',409);
+      const isSuper=u.role==='platform';
+      const old=b.id?(one('SELECT * FROM users WHERE id=?',b.id)||fail('İstifadəçi tapılmadı.',404)):null;
+      if(!isSuper&&old&&old.company!==u.company)fail('Yalnız öz şirkətinizin istifadəçilərini idarə edə bilərsiniz.',403);
+      const allowedRoles=isSuper?['platform','admin','member']:['admin','member'];
+      const role=choose(b.role,allowedRoles);
+      const active=b.active===false?0:1;
+      let targetCompany=null;
+      if(role!=='platform'){
+        const compId=isSuper?Number(b.company):u.company;
+        if(!compId)fail('Şirkət seçin.');
+        targetCompany=company(compId);
+        const isNewToCompany=(!old||old.company!==targetCompany.id||!old.active)&&active;
+        if(isNewToCompany&&targetCompany.used>=targetCompany.seats)fail('Şirkətin istifadəçi limiti dolub.',409);
+      }
       if(old){
-        if(old.id===u.id&&(!active||role!=='admin'))fail('Öz administrator girişinizi dəyişə bilməzsiniz.');
-        if(old.active&&old.role==='admin'&&(!active||role!=='admin')&&!one("SELECT id FROM users WHERE role='admin' AND active=1 AND company=? AND id<>?",c.id,old.id))fail('Şirkətdə aktiv administrator qalmalıdır.');
-        run('UPDATE users SET name=?,email=?,role=?,active=? WHERE id=?',str(b.name),email(b.email),role,active,old.id);
+        if(old.id===u.id&&(!active||role!==u.role))fail('Öz administrator hesabınızın rolunu və ya aktivliyini dəyişə bilməzsiniz.');
+        if(!isSuper&&old.company&&old.active&&old.role==='admin'&&(!active||role!=='admin')&&!one("SELECT id FROM users WHERE role='admin' AND active=1 AND company=? AND id<>?",old.company,old.id))fail('Şirkətdə aktiv administrator qalmalıdır.');
+        const compVal=targetCompany?targetCompany.id:null;
+        run('UPDATE users SET name=?,email=?,role=?,company=?,active=? WHERE id=?',str(b.name),email(b.email),role,compVal,active,old.id);
         if(b.password)run('UPDATE users SET hash=? WHERE id=?',hash(b.password),old.id);
-        if(!active||b.password||role!==old.role)run('DELETE FROM sessions WHERE user=?',old.id);
-      }else user(b.name,b.email,b.password,role,c.id);
+        if(old.company&&compVal!==old.company)run('UPDATE tasks SET owner=NULL WHERE owner=? AND project IN (SELECT id FROM projects WHERE company=?)',old.id,old.company);
+        if(!active||b.password||role!==old.role||compVal!==old.company)run('DELETE FROM sessions WHERE user=?',old.id);
+      }else{
+        const compVal=targetCompany?targetCompany.id:null;
+        user(b.name,b.email,b.password,role,compVal);
+      }
+      break;
+    }
+    case 'deleteUser':{
+      platform(u);
+      const target=one('SELECT * FROM users WHERE id=?',b.id)||fail('İstifadəçi tapılmadı.',404);
+      if(target.id===u.id)fail('Öz super administrator hesabınızı silə bilməzsiniz.');
+      if(target.role==='platform'&&!one("SELECT id FROM users WHERE role='platform' AND id<>?",target.id))fail('Sistemdə ən azı bir super administrator qalmalıdır.');
+      run('UPDATE tasks SET owner=NULL WHERE owner=?',target.id);
+      run('UPDATE comments SET author=NULL WHERE author=?',target.id);
+      run('DELETE FROM sessions WHERE user=?',target.id);
+      run('DELETE FROM users WHERE id=?',target.id);
       break;
     }
     case 'project':staff(u);insert('INSERT INTO projects(name,company) VALUES(?,?)',str(b.name),u.company);break;

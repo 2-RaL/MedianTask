@@ -542,3 +542,22 @@
   color: var(--muted);
   margin-top: 4px;
 }
+
+button.danger {
+  color: #9d3e2b;
+  border-color: #e2c0b8;
+  background: #fdf5f3;
+}
+button.danger:hover {
+  background: #f8ded7;
+  border-color: #d89e92;
+}
+.primary.danger {
+  background: #9d3e2b;
+  border-color: #9d3e2b;
+  color: white;
+}
+.primary.danger:hover {
+  background: #7d2e1e;
+  border-color: #7d2e1e;
+}
