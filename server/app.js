@@ -34,11 +34,21 @@ CREATE TABLE IF NOT EXISTS group_members(group_id INTEGER NOT NULL REFERENCES gr
 CREATE TABLE IF NOT EXISTS sessions(token TEXT PRIMARY KEY,user INTEGER REFERENCES users,expires INTEGER NOT NULL);`);
 try{db.exec('ALTER TABLE tasks ADD COLUMN group_id INTEGER REFERENCES groups(id) ON DELETE SET NULL;');}catch{}
 try{db.exec('ALTER TABLE tasks ADD COLUMN created_by INTEGER REFERENCES users(id) ON DELETE SET NULL;');}catch{}
+try{db.exec('ALTER TABLE tasks ADD COLUMN supervisor INTEGER REFERENCES users(id) ON DELETE SET NULL;');}catch{}
+try{db.exec('ALTER TABLE tasks ADD COLUMN created TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP;');}catch{}
 try{db.exec('CREATE TABLE IF NOT EXISTS note_shares(note_id INTEGER NOT NULL REFERENCES notes(id) ON DELETE CASCADE,user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,PRIMARY KEY(note_id, user_id));');}catch{}
+try{db.exec('CREATE TABLE IF NOT EXISTS task_history(id INTEGER PRIMARY KEY, task INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE, actor INTEGER REFERENCES users(id) ON DELETE SET NULL, action TEXT NOT NULL, details TEXT, created TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);');}catch{}
 const one=(sql,...p)=>db.prepare(sql).get(...p);
 const all=(sql,...p)=>db.prepare(sql).all(...p);
 const run=(sql,...p)=>db.prepare(sql).run(...p);
 const insert=(sql,...p)=>Number(run(sql,...p).lastInsertRowid);
+function logTaskHistory(taskId, actorId, action, details=''){
+  try {
+    run('INSERT INTO task_history(task,actor,action,details) VALUES(?,?,?,?)', taskId, actorId, action, details);
+  } catch(e) {}
+}
+const statusNamesAz={todo:'Planlaşdırılıb',doing:'İcradadır',review:'Yoxlamada',done:'Tamamlanıb'};
+const priorityNamesAz={low:'Aşağı',normal:'Orta',high:'Yüksək'};
 function fail(message,status=400){throw Object.assign(new Error(message),{status});}
 function tx(fn){db.exec('BEGIN IMMEDIATE');try{const out=fn();db.exec('COMMIT');return out;}catch(e){db.exec('ROLLBACK');throw e;}}
 function str(v,max=120){if(typeof v!=='string'||!v.trim()||v.trim().length>max)fail('Mətni və onun uzunluğunu yoxlayın.');return v.trim();}
@@ -109,7 +119,7 @@ function task(id,c,u){
   const t=one('SELECT t.*, p.company AS company_id FROM tasks t JOIN projects p ON t.project=p.id WHERE t.id=? AND p.company=?',id,c)||fail('Tapşırıq tapılmadı.',404);
   if(u&&u.role!=='admin'&&u.role!=='platform'){
     const isLead=t.group_id&&one('SELECT 1 FROM groups WHERE id=? AND lead=?',t.group_id,u.id);
-    if(t.owner!==u.id&&t.created_by!==u.id&&!isLead)fail('Yalnız sizə təyin edilən və ya yaratdığınız tapşırıqlara icazəniz var.',403);
+    if(t.owner!==u.id&&t.created_by!==u.id&&t.supervisor!==u.id&&!isLead)fail('Yalnız sizə təyin edilən, nəzarət etdiyiniz və ya yaratdığınız tapşırıqlara icazəniz var.',403);
   }
   return t;
 }
@@ -139,6 +149,7 @@ function state(u){
     const tasks=all('SELECT t.*, g.name AS group_name, p.company AS company_id, c.name AS company_name FROM tasks t JOIN projects p ON p.id=t.project LEFT JOIN companies c ON c.id=p.company LEFT JOIN groups g ON g.id=t.group_id ORDER BY t.id');
     const projects=all('SELECT p.*, c.name AS company_name FROM projects p JOIN companies c ON c.id=p.company ORDER BY p.id');
     const comments=all('SELECT m.* FROM comments m JOIN tasks t ON t.id=m.task ORDER BY m.id');
+    const history=all('SELECT h.*, u.name AS actor_name FROM task_history h LEFT JOIN users u ON u.id=h.actor ORDER BY h.id ASC');
     return {
       me:u,
       company:null,
@@ -149,6 +160,7 @@ function state(u){
       projects,
       tasks,
       comments,
+      history,
       notes
     };
   }
@@ -159,11 +171,14 @@ function state(u){
   }));
   const tasks=(u.role==='admin')
     ? all('SELECT t.*, g.name AS group_name, p.company AS company_id FROM tasks t JOIN projects p ON p.id=t.project LEFT JOIN groups g ON g.id=t.group_id WHERE p.company=? ORDER BY t.id', c)
-    : all('SELECT t.*, g.name AS group_name, p.company AS company_id FROM tasks t JOIN projects p ON p.id=t.project LEFT JOIN groups g ON g.id=t.group_id WHERE p.company=? AND (t.owner=? OR t.created_by=? OR (t.group_id IS NOT NULL AND t.group_id IN (SELECT id FROM groups WHERE lead=?))) ORDER BY t.id', c, u.id, u.id, u.id);
+    : all('SELECT t.*, g.name AS group_name, p.company AS company_id FROM tasks t JOIN projects p ON p.id=t.project LEFT JOIN groups g ON g.id=t.group_id WHERE p.company=? AND (t.owner=? OR t.created_by=? OR t.supervisor=? OR (t.group_id IS NOT NULL AND t.group_id IN (SELECT id FROM groups WHERE lead=?))) ORDER BY t.id', c, u.id, u.id, u.id, u.id);
   const comments=(u.role==='admin')
     ? all('SELECT m.* FROM comments m JOIN tasks t ON t.id=m.task JOIN projects p ON p.id=t.project WHERE p.company=? ORDER BY m.id', c)
-    : all('SELECT m.* FROM comments m JOIN tasks t ON t.id=m.task JOIN projects p ON p.id=t.project WHERE p.company=? AND (t.owner=? OR t.created_by=? OR (t.group_id IS NOT NULL AND t.group_id IN (SELECT id FROM groups WHERE lead=?))) ORDER BY m.id', c, u.id, u.id, u.id);
-  return {me:u,company:company(c),users:all('SELECT '+publicUser+' FROM users WHERE company=?',c),groups,projects:all('SELECT * FROM projects WHERE company=?',c),tasks,comments,notes};
+    : all('SELECT m.* FROM comments m JOIN tasks t ON t.id=m.task JOIN projects p ON p.id=t.project WHERE p.company=? AND (t.owner=? OR t.created_by=? OR t.supervisor=? OR (t.group_id IS NOT NULL AND t.group_id IN (SELECT id FROM groups WHERE lead=?))) ORDER BY m.id', c, u.id, u.id, u.id, u.id);
+  const history=(u.role==='admin')
+    ? all('SELECT h.*, u.name AS actor_name FROM task_history h JOIN tasks t ON t.id=h.task JOIN projects p ON p.id=t.project LEFT JOIN users u ON u.id=h.actor WHERE p.company=? ORDER BY h.id ASC', c)
+    : all('SELECT h.*, u.name AS actor_name FROM task_history h JOIN tasks t ON t.id=h.task JOIN projects p ON p.id=t.project LEFT JOIN users u ON u.id=h.actor WHERE p.company=? AND (t.owner=? OR t.created_by=? OR t.supervisor=? OR (t.group_id IS NOT NULL AND t.group_id IN (SELECT id FROM groups WHERE lead=?))) ORDER BY h.id ASC', c, u.id, u.id, u.id, u.id);
+  return {me:u,company:company(c),users:all('SELECT '+publicUser+' FROM users WHERE company=?',c),groups,projects:all('SELECT * FROM projects WHERE company=?',c),tasks,comments,history,notes};
 }
 function change(action,b,u){
   switch(action){
@@ -367,7 +382,39 @@ function change(action,b,u){
           if(!one('SELECT 1 FROM group_members WHERE group_id=? AND user_id=?',t.group_id,owner))fail('Seçilən əməkdaş bu şöbənin üzvü olmalıdır.');
         }
         const finalGroupId=(b.group!==undefined)?(b.group?Number(b.group):null):t.group_id;
-        if(!run('UPDATE tasks SET title=?,details=?,project=?,owner=?,status=?,priority=?,due=?,group_id=?,version=version+1 WHERE id=? AND version=?',title,details,project,owner,status,priority,due,finalGroupId,b.id,b.version).changes)fail('Tapşırıq dəyişib. Yeniləyib təkrar açın.',409);
+        const finalSupervisor=(b.supervisor!==undefined)?(b.supervisor?Number(b.supervisor):null):t.supervisor;
+        if(finalSupervisor&&!one('SELECT id FROM users WHERE id=? AND company=? AND active=1',finalSupervisor,targetCompany)){
+          fail('Aktiv nəzarətçi seçin.');
+        }
+        if(!run('UPDATE tasks SET title=?,details=?,project=?,owner=?,status=?,priority=?,due=?,group_id=?,supervisor=?,version=version+1 WHERE id=? AND version=?',title,details,project,owner,status,priority,due,finalGroupId,finalSupervisor,b.id,b.version).changes)fail('Tapşırıq dəyişib. Yeniləyib təkrar açın.',409);
+
+        if(t.owner!==owner){
+          const oldO=one('SELECT name FROM users WHERE id=?',t.owner);
+          const newO=one('SELECT name FROM users WHERE id=?',owner);
+          logTaskHistory(t.id, u.id, 'reassigned', `Məsul şəxs dəyişdirildi: ${oldO?.name||'Təyin edilməyib'} ➔ ${newO?.name||'Təyin edilməyib'}`);
+        }
+        if(t.supervisor!==finalSupervisor){
+          const oldS=t.supervisor?one('SELECT name FROM users WHERE id=?',t.supervisor):null;
+          const newS=finalSupervisor?one('SELECT name FROM users WHERE id=?',finalSupervisor):null;
+          logTaskHistory(t.id, u.id, 'supervisor', `Tapşırığa nəzarətçi dəyişdirildi: ${oldS?.name||'Təyin edilməyib'} ➔ ${newS?.name||'Təyin edilməyib'}`);
+        }
+        if(t.status!==status){
+          logTaskHistory(t.id, u.id, 'status', `Mərhələ dəyişdirildi: ${statusNamesAz[t.status]||t.status} ➔ ${statusNamesAz[status]||status}`);
+        }
+        if(t.priority!==priority){
+          logTaskHistory(t.id, u.id, 'priority', `Prioritet dəyişdirildi: ${priorityNamesAz[t.priority]||t.priority} ➔ ${priorityNamesAz[priority]||priority}`);
+        }
+        if(t.title!==title||t.details!==details||t.due!==due||t.project!==project){
+          let changeDetails=[];
+          if(t.title!==title)changeDetails.push(`Ad: "${title}"`);
+          if(t.due!==due)changeDetails.push(`Son tarix: ${due||'Tarixsiz'}`);
+          if(t.project!==project){
+            const prj=one('SELECT name FROM projects WHERE id=?',project);
+            changeDetails.push(`Layihə: ${prj?.name||project}`);
+          }
+          if(t.details!==details)changeDetails.push(`Təsvir yeniləndi`);
+          logTaskHistory(t.id, u.id, 'edited', `Parametrlər yeniləndi: ${changeDetails.join(', ')}`);
+        }
       }else{
         let owners=[];
         if(b.target==='leader'){
@@ -387,8 +434,19 @@ function change(action,b,u){
         for(const o of owners){
           if(!one('SELECT id FROM users WHERE id=? AND company=? AND active=1',o,targetCompany))fail('Seçilən əməkdaş və ya rəhbər aktiv olmalıdır.');
         }
+        const supervisor=(b.supervisor&&one('SELECT id FROM users WHERE id=? AND company=? AND active=1',Number(b.supervisor),targetCompany))?Number(b.supervisor):null;
+        const supUser=supervisor?one('SELECT name FROM users WHERE id=?',supervisor):null;
+
         for(const o of owners){
-          insert('INSERT INTO tasks(title,details,project,owner,status,priority,due,group_id,created_by) VALUES(?,?,?,?,?,?,?,?,?)',title,details,project,o,status,priority,due,groupId,u.id);
+          const newTaskId=insert('INSERT INTO tasks(title,details,project,owner,status,priority,due,group_id,created_by,supervisor) VALUES(?,?,?,?,?,?,?,?,?,?)',title,details,project,o,status,priority,due,groupId,u.id,supervisor);
+          const oUser=one('SELECT name FROM users WHERE id=?',o);
+          let logTxt=`Tapşırıq yaradıldı. Məsul şəxs: ${oUser?.name||'Təyin edilməyib'}`;
+          if(supUser)logTxt+=`, Nəzarətçi: ${supUser.name}`;
+          if(groupId){
+            const gObj=one('SELECT name FROM groups WHERE id=?',groupId);
+            if(gObj)logTxt+=` (${gObj.name} şöbəsi)`;
+          }
+          logTaskHistory(newTaskId, u.id, 'created', logTxt);
         }
       }
       break;
@@ -423,9 +481,14 @@ function change(action,b,u){
         }
       }
 
+      const oldOwner=one('SELECT name FROM users WHERE id=?',t.owner);
+      const newOwner=one('SELECT name FROM users WHERE id=?',owners[0]);
       run('UPDATE tasks SET owner=?, version=version+1 WHERE id=?',owners[0],t.id);
+      logTaskHistory(t.id, u.id, 'delegated', `Tapşırıq yönləndirildi: ${oldOwner?.name||'Bilinmir'} ➔ ${newOwner?.name||'Bilinmir'}`);
       for(let i=1;i<owners.length;i++){
-        insert('INSERT INTO tasks(title,details,project,owner,status,priority,due,group_id,created_by) VALUES(?,?,?,?,?,?,?,?,?)',t.title,t.details,t.project,owners[i],t.status,t.priority,t.due,t.group_id,u.id);
+        const clonedId=insert('INSERT INTO tasks(title,details,project,owner,status,priority,due,group_id,created_by,supervisor) VALUES(?,?,?,?,?,?,?,?,?,?)',t.title,t.details,t.project,owners[i],t.status,t.priority,t.due,t.group_id,u.id,t.supervisor);
+        const oUser=one('SELECT name FROM users WHERE id=?',owners[i]);
+        logTaskHistory(clonedId, u.id, 'created', `Tapşırıq şöbə daxilində yönləndirilmə ilə yaradıldı. Məsul şəxs: ${oUser?.name||'Bilinmir'}`);
       }
       break;
     }
@@ -486,13 +549,25 @@ function change(action,b,u){
     case 'status':case 'comment':case 'deleteTask':{
       if(u.role!=='platform'&&!u.company)fail('Şirkət hesabı tələb olunur.',403);
       const t=task(b.id,u.company,u);
-      if(action==='comment'){insert('INSERT INTO comments(task,author,body) VALUES(?,?,?)',t.id,u.id,str(b.body,3000));break;}
+      if(action==='comment'){
+        const commentBody=str(b.body,3000);
+        insert('INSERT INTO comments(task,author,body) VALUES(?,?,?)',t.id,u.id,commentBody);
+        const preview=commentBody.length>60?commentBody.slice(0,60)+'...':commentBody;
+        logTaskHistory(t.id, u.id, 'comment', `Şərh əlavə edildi: "${preview}"`);
+        break;
+      }
       if(action==='deleteTask'){
         if(u.role!=='platform'&&u.role!=='admin'&&t.created_by!==u.id)fail('Yalnız tapşırığı yaradan şəxs və ya administrator silə bilər.',403);
       }else if(u.role!=='platform'&&u.role!=='admin'&&t.owner!==u.id)fail('Yalnız sizə təyin edilən tapşırığı keçirə bilərsiniz.',403);
       if(t.version!==b.version)fail('Tapşırıq dəyişib. Yeniləyib təkrar açın.',409);
       if(action==='deleteTask')run('DELETE FROM tasks WHERE id=?',t.id);
-      else run('UPDATE tasks SET status=?,version=version+1 WHERE id=?',choose(b.status,statuses),t.id);
+      else {
+        const newStatus=choose(b.status,statuses);
+        run('UPDATE tasks SET status=?,version=version+1 WHERE id=?',newStatus,t.id);
+        if(t.status!==newStatus){
+          logTaskHistory(t.id, u.id, 'status', `Mərhələ dəyişdirildi: ${statusNamesAz[t.status]||t.status} ➔ ${statusNamesAz[newStatus]||newStatus}`);
+        }
+      }
       break;
     }
     default:fail('Ünvan tapılmadı.',404);

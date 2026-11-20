@@ -206,5 +206,34 @@ test('Şirkətlər, limitlər, səlahiyyətlər və tapşırıqlar',async t=>{
   assert.ok(appJsContent.includes('Worksheet ss:Name="Tapşırıqlar"'), 'Excel export must contain Tasks worksheet');
   assert.ok(appJsContent.includes('CƏMİ TAPŞIRIQ') && appJsContent.includes('VAXTINDA İCRA'), 'Excel Dashboard contains KPI cards');
 
+  // Test supervisor (Tapşırığa nəzarət) and activity history (tarixçə)
+  // Create a 4th member to verify supervisor visibility
+  await post('user', a, {name: 'Nəzarətçi Əməkdaş', email: 'supervisor@test.local', password: 'Password123456*', role: 'member'});
+  const supUser = (await state(a)).users.find(u => u.email === 'supervisor@test.local');
+  const supSign = (await req('login', null, {email: 'supervisor@test.local', password: 'Password123456*'})).headers.get('set-cookie').split(';')[0];
+
+  // Admin creates task with thirdUser as owner and supUser as supervisor
+  await post('task', a, {title: 'Nəzarətli Tapşırıq', details: 'Nəzarət altında icra', project: 1, status: 'todo', owner: thirdUser.id, supervisor: supUser.id, priority: 'high'});
+  const supTasks = (await state(supSign)).tasks;
+  const supervisedTask = supTasks.find(t => t.title === 'Nəzarətli Tapşırıq');
+  assert.ok(supervisedTask, 'Supervisor should see task in their task list');
+  assert.equal(supervisedTask.supervisor, supUser.id, 'Task supervisor column correctly assigned');
+
+  // Comment and status update should record history
+  await post('comment', supSign, {id: supervisedTask.id, body: 'Nəzarətçi qeydi'});
+  await post('status', thirdSign, {id: supervisedTask.id, version: supervisedTask.version, status: 'doing'});
+
+  const stWithHistory = await state(a);
+  const taskHist = stWithHistory.history.filter(h => h.task === supervisedTask.id);
+  assert.ok(taskHist.length >= 3, 'Task should have created, comment, and status history entries');
+  assert.ok(taskHist.some(h => h.action === 'created'), 'History has created action');
+  assert.ok(taskHist.some(h => h.action === 'comment'), 'History has comment action');
+  assert.ok(taskHist.some(h => h.action === 'status'), 'History has status action');
+
+  // Verify sidebar redundant sideProjects div is removed from index.html
+  const indexHtmlContent = await readFile(fileURLToPath(new URL('../public/index.html', import.meta.url)), 'utf-8');
+  assert.ok(!indexHtmlContent.includes('class="sideProjects"'), 'Duplicate sideProjects block must be removed');
+  assert.ok(indexHtmlContent.includes('detail-tabs-bar'), 'Task detail should have tabs for history and comments');
+
   await post('logout',a,{});assert.equal((await req('state',a)).status,401);
 });

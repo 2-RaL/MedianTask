@@ -33,7 +33,8 @@ const app=createApp({
   teamTab:'members',
   taskTarget:'users',
   delegateOwners:[],
-  projectSearchQuery:''
+  projectSearchQuery:'',
+  detailTab:'history'
  }),
  computed:{
   isPlatform(){return this.s?.me.role==='platform'},admin(){return this.s?.me.role==='admin'},
@@ -365,6 +366,14 @@ const app=createApp({
     const memberIds=this.currentGroup.member_ids||[];
     return (this.s?.users||[]).filter(u=>u.active&&memberIds.includes(u.id));
   },
+  currentTaskHistory(){
+    if(!this.current||!this.s?.history)return [];
+    return this.s.history.filter(h=>h.task===this.current.id);
+  },
+  currentTaskComments(){
+    if(!this.current||!this.s?.comments)return [];
+    return this.s.comments.filter(c=>c.task===this.current.id);
+  },
   allProjectsDetailed(){
     let projs = this.availableProjects;
     if(this.projectSearchQuery && this.projectSearchQuery.trim()){
@@ -504,6 +513,7 @@ const app=createApp({
     }else if(type==='detail'){
       this.form={...data};
       this.delegateOwners=data.owner?[data.owner]:[];
+      this.detailTab='history';
     }else if(type==='task'){
       const compId=this.isPlatform?(initialCompany||this.s.companies?.[0]?.id):this.s.me.company;
       const compProjs=this.isPlatform?this.s.projects.filter(p=>p.company===Number(compId)):this.s.projects;
@@ -527,6 +537,7 @@ const app=createApp({
           group:data.group_id||'',
           owner:data.owner||'',
           owners:data.owner?[data.owner]:[],
+          supervisor:data.supervisor||'',
           status:data.status,
           priority:data.priority,
           due:data.due||''
@@ -540,6 +551,7 @@ const app=createApp({
           group:defaultGroup,
           owner:defaultOwner,
           owners:defaultOwner?[defaultOwner]:[],
+          supervisor:'',
           status:data.status||'todo',
           priority:'normal',
           due:''
@@ -609,6 +621,7 @@ const app=createApp({
       const payload={
         ...this.form,
         target:this.taskTarget,
+        supervisor:this.form.supervisor ? Number(this.form.supervisor) : null,
         group:(this.taskTarget==='group'||this.form.id)?this.form.group:null
       };
       this.mutate('task',payload,()=>this.close());
@@ -735,6 +748,34 @@ const app=createApp({
       return `${parseInt(parts[2],10)} ${m[parseInt(parts[1],10)-1]} ${parts[0]}`;
     }
     return d;
+  },
+  formatDateTimeAz(dtStr){
+    if(!dtStr)return '';
+    try{
+      const d=new Date(dtStr.endsWith('Z')||dtStr.includes('+')?dtStr:dtStr+'Z');
+      if(isNaN(d.getTime()))return dtStr;
+      const day=String(d.getDate()).padStart(2,'0');
+      const month=String(d.getMonth()+1).padStart(2,'0');
+      const year=d.getFullYear();
+      const hours=String(d.getHours()).padStart(2,'0');
+      const mins=String(d.getMinutes()).padStart(2,'0');
+      return `${day}.${month}.${year} ${hours}:${mins}`;
+    }catch{
+      return dtStr;
+    }
+  },
+  historyActionBadge(action){
+    const map={
+      created:{label:'Yaradıldı',cls:'tag-created'},
+      reassigned:{label:'Məsul şəxs',cls:'tag-reassigned'},
+      supervisor:{label:'Nəzarətçi',cls:'tag-supervisor'},
+      delegated:{label:'Yönləndirildi',cls:'tag-delegated'},
+      status:{label:'Mərhələ',cls:'tag-status'},
+      priority:{label:'Prioritet',cls:'tag-priority'},
+      edited:{label:'Redaktə',cls:'tag-edited'},
+      comment:{label:'Şərh',cls:'tag-comment'}
+    };
+    return map[action]||{label:'Dəyişiklik',cls:'tag-default'};
   },
   prevMonth(){
     if(this.calMonth===0){this.calMonth=11;this.calYear--;}
@@ -1103,6 +1144,7 @@ const app=createApp({
       const pr=this.priorities[t.priority]||t.priority;
       const proj=this.projectName(t.project)||'—';
       const owner=this.person(t.owner);
+      const supervisor=t.supervisor ? this.person(t.supervisor) : '—';
       const isLate=this.late(t);
       const statusBadge = isLate ? 'BadgeLate' : (t.status === 'done' ? 'BadgeDone' : 'CellCenter');
       const statusLabel = isLate ? 'Gecikib' : (t.status === 'done' ? 'Tamamlanıb' : (t.status === 'doing' ? 'İcradadır' : (t.status === 'review' ? 'Yoxlamada' : 'Planlaşdırılıb')));
@@ -1113,6 +1155,7 @@ const app=createApp({
     <Cell ss:StyleID="CellText"><Data ss:Type="String">${esc(t.details||'')}</Data></Cell>
     <Cell ss:StyleID="CellText"><Data ss:Type="String">${esc(proj)}</Data></Cell>
     <Cell ss:StyleID="CellText"><Data ss:Type="String">${esc(owner)}</Data></Cell>
+    <Cell ss:StyleID="CellText"><Data ss:Type="String">${esc(supervisor)}</Data></Cell>
     <Cell ss:StyleID="CellCenter"><Data ss:Type="String">${esc(st)}</Data></Cell>
     <Cell ss:StyleID="CellCenter"><Data ss:Type="String">${esc(pr)}</Data></Cell>
     <Cell ss:StyleID="${isLate ? 'BadgeLate' : 'CellCenter'}"><Data ss:Type="String">${esc(t.due||'Tarixsiz')}</Data></Cell>
@@ -1336,6 +1379,7 @@ ${dashRowsXml}
    <Column ss:Width="240"/>
    <Column ss:Width="140"/>
    <Column ss:Width="140"/>
+   <Column ss:Width="140"/>
    <Column ss:Width="105"/>
    <Column ss:Width="95"/>
    <Column ss:Width="95"/>
@@ -1347,6 +1391,7 @@ ${dashRowsXml}
     <Cell ss:StyleID="Header"><Data ss:Type="String">Təsvir</Data></Cell>
     <Cell ss:StyleID="Header"><Data ss:Type="String">Layihə</Data></Cell>
     <Cell ss:StyleID="Header"><Data ss:Type="String">Məsul şəxs</Data></Cell>
+    <Cell ss:StyleID="Header"><Data ss:Type="String">Nəzarətçi</Data></Cell>
     <Cell ss:StyleID="Header"><Data ss:Type="String">Mərhələ</Data></Cell>
     <Cell ss:StyleID="Header"><Data ss:Type="String">Prioritet</Data></Cell>
     <Cell ss:StyleID="Header"><Data ss:Type="String">Son tarix</Data></Cell>

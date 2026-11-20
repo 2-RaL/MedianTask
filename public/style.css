@@ -2385,3 +2385,230 @@ tr.row-overdue td:first-child {
   height: 48px;
   color: var(--muted);
 }
+
+/* Card & Table Supervisor Badges */
+.card-people-badges {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.card-sup-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #eef2f6;
+  border: 1px solid #c9d5e3;
+  border-radius: 12px;
+  padding: 1px 6px 1px 7px;
+  font-size: 10px;
+  color: #2b4c6f;
+  font-weight: 500;
+}
+.card-sup-badge small {
+  font-size: 9px;
+  text-transform: uppercase;
+  color: #557292;
+  letter-spacing: 0.3px;
+}
+.card-sup-badge .avatar {
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  font-size: 8px;
+}
+.badge-supervisor {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  background: #eef2f6;
+  color: #244161;
+  border: 1px solid #cbd7e6;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* Detail Modal Tabs Bar */
+.detail-tabs-bar {
+  display: flex;
+  gap: 8px;
+  margin: 16px 0 14px;
+  border-bottom: 2px solid var(--line);
+  padding-bottom: 2px;
+}
+.detail-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 14px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+  border-radius: 6px 6px 0 0;
+  transition: all .15s ease;
+}
+.detail-tab-btn:hover {
+  color: var(--ink);
+  background: #f1f3ed;
+}
+.detail-tab-btn.active {
+  color: var(--green);
+  border-bottom-color: var(--green);
+  background: #ebf2eb;
+}
+.detail-tab-btn .ico {
+  width: 15px;
+  height: 15px;
+}
+
+/* History Timeline Styles */
+.history-view {
+  margin-top: 10px;
+}
+.history-timeline {
+  position: relative;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.history-timeline::before {
+  content: "";
+  position: absolute;
+  top: 10px;
+  bottom: 10px;
+  left: 6px;
+  width: 2px;
+  background: var(--line);
+}
+.history-item {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+}
+.history-bullet {
+  position: absolute;
+  left: -20px;
+  top: 10px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--green);
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 2px #c4d7c7;
+  z-index: 1;
+}
+.history-bubble {
+  flex: 1;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 14px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+.history-bubble.fallback {
+  background: #fdfcf9;
+}
+.history-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.history-actor {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+.history-actor .avatar {
+  width: 22px;
+  height: 22px;
+  min-width: 22px;
+  font-size: 9px;
+}
+.history-tag {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+.tag-created { background: #d7edd8; color: #1e5a26; }
+.tag-reassigned { background: #ebdff7; color: #55277f; }
+.tag-supervisor { background: #d9ecf8; color: #195279; }
+.tag-delegated { background: #fcebd2; color: #874b09; }
+.tag-status { background: #e0e6fb; color: #22378a; }
+.tag-priority { background: #fbe0d8; color: #8c2e17; }
+.tag-edited { background: #ecefe9; color: #3c4942; }
+.tag-comment { background: #dcf2ee; color: #156154; }
+.tag-default { background: #edece8; color: #595854; }
+
+.history-time {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--muted);
+}
+.history-desc {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #2d3731;
+  word-break: break-word;
+}
+.history-empty {
+  padding: 8px 0;
+}
+
+/* Comments View Styling */
+.comments-view {
+  margin-top: 10px;
+}
+.comments-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 320px;
+  overflow-y: auto;
+  padding-right: 4px;
+  margin-bottom: 14px;
+}
+.comment-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.comment-head .avatar {
+  width: 22px;
+  height: 22px;
+  min-width: 22px;
+  font-size: 9px;
+}
+.comment-head strong {
+  font-size: 12px;
+}
+.comment-head small {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 11px;
+}
+.comment-form {
+  margin-top: 12px;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+.comment-form textarea {
+  width: 100%;
+  margin-top: 6px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+}
