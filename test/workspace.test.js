@@ -183,6 +183,17 @@ test('Şirkətlər, limitlər, səlahiyyətlər və tapşırıqlar',async t=>{
   await post('task', thirdSign, {id: createdByMember.id, version: createdByMember.version, title: 'Standart User Tapşırığı Yeniləndi', project: 1, owner: thirdUser.id, status: 'doing', priority: 'high'});
   assert.equal((await state(thirdSign)).tasks.find(t => t.id === createdByMember.id).title, 'Standart User Tapşırığı Yeniləndi');
 
+  // Test standard user adding task assigned to another user (must still be visible to creator!)
+  await post('task', thirdSign, {title: 'Başqasına təhkim edilən tapşırıq', details: 'Həmkar üçün iş', project: 1, status: 'todo', owner: aUser.id, priority: 'normal'});
+  const thirdTasksAfterAdd = (await state(thirdSign)).tasks;
+  const assignedToOther = thirdTasksAfterAdd.find(t => t.title === 'Başqasına təhkim edilən tapşırıq');
+  assert.ok(assignedToOther, 'Task created by member assigned to someone else MUST be visible to the creator');
+  assert.equal(assignedToOther.created_by, thirdUser.id);
+  assert.equal(assignedToOther.owner, aUser.id);
+  // Creator should be able to update status as well
+  await post('status', thirdSign, {id: assignedToOther.id, version: assignedToOther.version, status: 'doing'});
+  assert.equal((await state(thirdSign)).tasks.find(t => t.id === assignedToOther.id).status, 'doing');
+
   // Super Admin creating task directly assigned to organization leader
   await post('task', root, {title: 'Qurum Rəhbərinə Birbaşa Tapşırıq', details: 'Rəhbərə tapşırıq', company: 1, target: 'leader', priority: 'high', due: '2026-12-25'});
   const leaderTask = (await state(root)).tasks.find(t => t.title === 'Qurum Rəhbərinə Birbaşa Tapşırıq');

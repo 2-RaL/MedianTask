@@ -177,7 +177,9 @@ const app=createApp({
   baseTasks(){
     if(!this.s?.tasks)return [];
     let list=this.s.tasks;
-    if(this.page==='mine'||(!this.admin&&!this.isPlatform))list=list.filter(t=>t.owner===this.s.me.id);
+    if(this.page==='mine'){
+      list=list.filter(t=>t.owner===this.s.me.id || (!this.admin && !this.isPlatform && (t.created_by===this.s.me.id || t.supervisor===this.s.me.id)));
+    }
     if(this.isPlatform&&this.companyFilter&&this.companyFilter!=='platform'){
       list=list.filter(t=>t.company_id===Number(this.companyFilter));
     }
@@ -248,7 +250,7 @@ const app=createApp({
         ? this.s.tasks.filter(t=>t.company_id===Number(this.companyFilter))
         : this.s.tasks;
     }
-    return this.admin ? this.s.tasks : this.s.tasks.filter(t=>t.owner===this.s.me.id);
+    return this.admin ? this.s.tasks : this.s.tasks.filter(t=>t.owner===this.s.me.id || t.created_by===this.s.me.id || t.supervisor===this.s.me.id);
   },
   boardMetrics(){
     const t=this.page==='reports'?this.reportTasks:(this.page==='mine'?this.baseTasks:this.filtered);
@@ -524,7 +526,9 @@ const app=createApp({
       this.taskTarget=data.group_id?'group':(this.isPlatform&&!data.id?'leader':'users');
       const defaultProject=this.project||compProjs[0]?.id||'';
       const defaultGroup=compGroups[0]?.id||'';
-      const defaultOwner=this.page==='mine'?this.s.me.id:(this.taskTarget==='leader'&&leader?leader.id:(compUsers[0]?.id||this.s.me.id));
+      const defaultOwner=this.isPlatform
+        ? (this.taskTarget==='leader'&&leader?leader.id:(compUsers[0]?.id||''))
+        : this.s.me.id;
 
       if(data.id){
         this.form={
@@ -641,8 +645,8 @@ const app=createApp({
       this.form.owner=leader.id;
       this.form.owners=[leader.id];
     }else{
-      this.form.owner=compUsers[0]?.id||'';
-      this.form.owners=compUsers[0]?[compUsers[0].id]:[];
+      this.form.owner=this.isPlatform?(compUsers[0]?.id||''):this.s.me.id;
+      this.form.owners=this.isPlatform?(compUsers[0]?[compUsers[0].id]:[]):[this.s.me.id];
     }
   },
   openShareModal(n){

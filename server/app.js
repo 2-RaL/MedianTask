@@ -558,7 +558,7 @@ function change(action,b,u){
       }
       if(action==='deleteTask'){
         if(u.role!=='platform'&&u.role!=='admin'&&t.created_by!==u.id)fail('Yalnız tapşırığı yaradan şəxs və ya administrator silə bilər.',403);
-      }else if(u.role!=='platform'&&u.role!=='admin'&&t.owner!==u.id)fail('Yalnız sizə təyin edilən tapşırığı keçirə bilərsiniz.',403);
+      }else if(u.role!=='platform'&&u.role!=='admin'&&t.owner!==u.id&&t.created_by!==u.id&&t.supervisor!==u.id)fail('Yalnız sizə təyin edilən, yaratdığınız və ya nəzarət etdiyiniz tapşırığı keçirə bilərsiniz.',403);
       if(t.version!==b.version)fail('Tapşırıq dəyişib. Yeniləyib təkrar açın.',409);
       if(action==='deleteTask')run('DELETE FROM tasks WHERE id=?',t.id);
       else {

@@ -2612,3 +2612,14 @@ tr.row-overdue td:first-child {
   border-radius: 6px;
   border: 1px solid var(--line);
 }
+.created-me-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  background: #e3f2fd;
+  color: #1565c0;
+  border: 1px solid #bbdefb;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+}
