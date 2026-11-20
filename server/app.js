@@ -294,13 +294,30 @@ function change(action,b,u){
       break;
     }
     case 'project':{
-      if(u.role==='platform'){
-        const cId=Number(b.company);
-        if(!cId||!one('SELECT id FROM companies WHERE id=?',cId))fail('Şirkət seçin.');
-        insert('INSERT INTO projects(name,company) VALUES(?,?)',str(b.name),cId);
+      const name=str(b.name,120);
+      if(b.id){
+        const pId=Number(b.id);
+        const p=one('SELECT * FROM projects WHERE id=?',pId)||fail('Layihə tapılmadı.',404);
+        if(u.role!=='platform'){
+          staff(u);
+          if(p.company!==u.company)fail('Yalnız öz şirkətinizin layihələrini redaktə edə bilərsiniz.',403);
+        }
+        let targetCompany=p.company;
+        if(u.role==='platform'&&b.company){
+          const cId=Number(b.company);
+          if(!one('SELECT id FROM companies WHERE id=?',cId))fail('Şirkət seçin.');
+          targetCompany=cId;
+        }
+        run('UPDATE projects SET name=?, company=? WHERE id=?',name,targetCompany,pId);
       }else{
-        staff(u);
-        insert('INSERT INTO projects(name,company) VALUES(?,?)',str(b.name),u.company);
+        if(u.role==='platform'){
+          const cId=Number(b.company);
+          if(!cId||!one('SELECT id FROM companies WHERE id=?',cId))fail('Şirkət seçin.');
+          insert('INSERT INTO projects(name,company) VALUES(?,?)',name,cId);
+        }else{
+          staff(u);
+          insert('INSERT INTO projects(name,company) VALUES(?,?)',name,u.company);
+        }
       }
       break;
     }

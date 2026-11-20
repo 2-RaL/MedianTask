@@ -130,6 +130,18 @@ test('Şirkətlər, limitlər, səlahiyyətlər və tapşırıqlar',async t=>{
   assert.ok(superProj);
   assert.equal(superProj.company, 1);
 
+  // Test project editing (renaming / fixing spelling typos)
+  await post('project', a, {name: 'İlkin Səhv Layihə'});
+  const createdProj = (await state(a)).projects.find(p => p.name === 'İlkin Səhv Layihə');
+  assert.ok(createdProj, 'Project created');
+  await post('project', a, {id: createdProj.id, name: 'Düzəliş Edilmiş Layihə'});
+  const updatedProj = (await state(a)).projects.find(p => p.id === createdProj.id);
+  assert.equal(updatedProj.name, 'Düzəliş Edilmiş Layihə', 'Project name successfully edited');
+  await post('project', thirdSign, {id: createdProj.id, name: 'İcazəsiz dəyişiklik'}, 403);
+  await post('project', b, {id: createdProj.id, name: 'Başqa şirkət layihəsi'}, 403);
+  await post('project', root, {id: createdProj.id, name: 'Super Admin Düzəlişi'});
+  assert.equal((await state(a)).projects.find(p => p.id === createdProj.id).name, 'Super Admin Düzəlişi');
+
   // Super Admin creating task
   await post('task', root, {title: 'Super Tapşırıq', details: 'Admin tapşırığı', project: superProj.id, status: 'todo', priority: 'high', owner: aUser.id, due: '2026-11-01'});
   let superTask = (await state(root)).tasks.find(t => t.title === 'Super Tapşırıq');

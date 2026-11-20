@@ -1681,3 +1681,135 @@ tr.row-overdue td:first-child {
   color: #635327;
   line-height: 1.4;
 }
+
+/* Sidebar Project Items & Editing */
+.sideProjectItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-radius: 6px;
+  margin-bottom: 2px;
+  transition: background 0.15s ease;
+}
+.sideProjectItem:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+.sideProjectItem.selected {
+  background: rgba(20, 69, 43, 0.09);
+}
+.sideProjectBtn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  border: 0;
+  padding: 6px 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
+  overflow: hidden;
+  border-radius: 6px;
+}
+.sideProjectBtn span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sideProjectEdit {
+  opacity: 0;
+  background: transparent;
+  border: 0;
+  padding: 3px 6px;
+  font-size: 12px;
+  color: var(--muted);
+  cursor: pointer;
+  border-radius: 4px;
+  transition: opacity 0.15s, color 0.15s, background 0.15s;
+  flex-shrink: 0;
+}
+.sideProjectItem:hover .sideProjectEdit,
+.sideProjectItem.selected .sideProjectEdit {
+  opacity: 1;
+}
+.sideProjectEdit:hover {
+  color: var(--green);
+  background: rgba(0, 0, 0, 0.06);
+}
+.sideProjectAdd {
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+  padding: 6px 8px;
+  background: transparent;
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.15s ease;
+}
+.sideProjectAdd:hover {
+  border-color: var(--green);
+  color: var(--green);
+  background: rgba(20, 69, 43, 0.04);
+}
+
+/* Toolbar Project Filter Inline Edit */
+.project-filter-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.btn-inline-edit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 9px;
+  font-size: 12px;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.btn-inline-edit:hover {
+  color: var(--green);
+  border-color: var(--green);
+  background: #f4f8f5;
+}
+
+/* Reports Project Edit Button */
+.btn-edit-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--muted);
+  cursor: pointer;
+  margin-left: 8px;
+  vertical-align: middle;
+  transition: all 0.15s ease;
+}
+.btn-edit-badge:hover {
+  color: var(--green);
+  border-color: var(--green);
+  background: #f0f7f2;
+}
+
+.modal-sub-hint {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 6px;
+  margin-bottom: 0;
+}

@@ -363,6 +363,10 @@ const app=createApp({
   roleName(r){return {platform:'Platforma administratoru',admin:'Şirkət administratoru',member:'Əməkdaş'}[r]},
   initials(n){return n.split(/\s+/).slice(0,2).map(s=>s[0]).join('').toLocaleUpperCase('az')},person(id){return this.s.users.find(u=>u.id===id)?.name||'Təyin edilməyib'},
   projectName(id){return this.s.projects.find(p=>p.id===id)?.name},projectIndex(id){return this.s.projects.findIndex(p=>p.id===id)%4},
+  openProjectEdit(id){
+    const p=this.s?.projects?.find(x=>x.id===Number(id));
+    if(p)this.open('project',p);
+  },
   dateLabel(d){return d?new Date(d+'T12:00:00').toLocaleDateString('az-AZ',{day:'numeric',month:'short'}):'Tarixsiz'},
   late(t){const d=new Date();d.setHours(0,0,0,0);return !!t.due&&t.status!=='done'&&new Date(t.due+'T00:00:00')<d},
   percent(id){const t=this.s.tasks.filter(t=>t.project===id);return t.length?Math.round(100*t.filter(t=>t.status==='done').length/t.length):0},
@@ -477,7 +481,11 @@ const app=createApp({
     if(this.modal==='project'){
       if(!this.form.name?.trim()){this.error='Layihə adını daxil edin.';return;}
       if(this.isPlatform&&!this.form.company){this.error='Şirkət seçin.';return;}
-      this.mutate('project',this.form,()=>this.close());
+      const isEdit=!!this.form.id;
+      this.mutate('project',this.form,()=>{
+        this.close();
+        this.notify(isEdit?'Layihənin adı yeniləndi.':'Yeni layihə yaradıldı.');
+      });
       return;
     }
     if(this.modal==='task'){
@@ -757,7 +765,6 @@ ${rowsXml}
     a.download=(this.isPlatform?('Meridian'+compPart+'-Hesabat'):(this.admin?'Meridian-Tapshiriqlar':'Meridian-Ferdi-Hesabat'))+'-'+this.todayDateStr+'.xls';
     a.click();
     setTimeout(()=>URL.revokeObjectURL(url),1000);
-  },
   },
   csv(){const tasks=this.reportTasks;const rows=[['Tapşırıq','Layihə','Məsul şəxs','Mərhələ','Prioritet','Son tarix'],...tasks.map(t=>[t.title,this.projectName(t.project),this.person(t.owner),this.statuses[t.status],this.priorities[t.priority],t.due])];const quote=v=>'"'+String(v||'').replace(/^[\s]*[=+@-]/,m=>"'"+m).replaceAll('"','""')+'"';const url=URL.createObjectURL(new Blob(['\uFEFF'+rows.map(r=>r.map(quote).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download=(this.admin?'Meridian-Umumi-Hesabat.csv':'Meridian-Ferdi-Hesabat.csv');a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}
  }
