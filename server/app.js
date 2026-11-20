@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY,name TEXT NOT NULL,email
 CREATE TABLE IF NOT EXISTS projects(id INTEGER PRIMARY KEY,name TEXT NOT NULL,company INTEGER NOT NULL REFERENCES companies);
 CREATE TABLE IF NOT EXISTS tasks(id INTEGER PRIMARY KEY,title TEXT NOT NULL,details TEXT NOT NULL,project INTEGER NOT NULL REFERENCES projects,owner INTEGER REFERENCES users,status TEXT NOT NULL,priority TEXT NOT NULL,due TEXT NOT NULL,version INTEGER DEFAULT 1);
 CREATE TABLE IF NOT EXISTS comments(id INTEGER PRIMARY KEY,task INTEGER REFERENCES tasks ON DELETE CASCADE,author INTEGER REFERENCES users,body TEXT NOT NULL,created TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
+CREATE TABLE IF NOT EXISTS notes(id INTEGER PRIMARY KEY,user INTEGER NOT NULL REFERENCES users ON DELETE CASCADE,title TEXT NOT NULL DEFAULT '',content TEXT NOT NULL,date TEXT,created TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
 CREATE TABLE IF NOT EXISTS sessions(token TEXT PRIMARY KEY,user INTEGER REFERENCES users,expires INTEGER NOT NULL);`);
 const one=(sql,...p)=>db.prepare(sql).get(...p);
 const all=(sql,...p)=>db.prepare(sql).all(...p);
@@ -98,9 +99,9 @@ function task(id,c){return one('SELECT t.* FROM tasks t JOIN projects p ON t.pro
 function staff(u){if(u.role!=='admin')fail('Şirkət administratorunun icazəsi tələb olunur.',403);}
 function platform(u){if(u.role!=='platform')fail('Platforma administratorunun icazəsi tələb olunur.',403);}
 function state(u){
-  if(u.role==='platform')return {me:u,plans:all('SELECT * FROM plans ORDER BY id'),companies:all(companySQL+' ORDER BY c.id'),users:all('SELECT '+publicUser+' FROM users ORDER BY id')};
+  if(u.role==='platform')return {me:u,plans:all('SELECT * FROM plans ORDER BY id'),companies:all(companySQL+' ORDER BY c.id'),users:all('SELECT '+publicUser+' FROM users ORDER BY id'),notes:all('SELECT * FROM notes WHERE user=? ORDER BY id DESC',u.id)};
   const c=u.company;
-  return {me:u,company:company(c),users:all('SELECT '+publicUser+' FROM users WHERE company=?',c),projects:all('SELECT * FROM projects WHERE company=?',c),tasks:all('SELECT t.* FROM tasks t JOIN projects p ON p.id=t.project WHERE p.company=? ORDER BY t.id',c),comments:all('SELECT m.* FROM comments m JOIN tasks t ON t.id=m.task JOIN projects p ON p.id=t.project WHERE p.company=? ORDER BY m.id',c)};
+  return {me:u,company:company(c),users:all('SELECT '+publicUser+' FROM users WHERE company=?',c),projects:all('SELECT * FROM projects WHERE company=?',c),tasks:all('SELECT t.* FROM tasks t JOIN projects p ON p.id=t.project WHERE p.company=? ORDER BY t.id',c),comments:all('SELECT m.* FROM comments m JOIN tasks t ON t.id=m.task JOIN projects p ON p.id=t.project WHERE p.company=? ORDER BY m.id',c),notes:all('SELECT * FROM notes WHERE user=? ORDER BY id DESC',u.id)};
 }
 function change(action,b,u){
   switch(action){
@@ -158,6 +159,7 @@ function change(action,b,u){
       if(target.role==='platform'&&!one("SELECT id FROM users WHERE role='platform' AND id<>?",target.id))fail('Sistemdə ən azı bir super administrator qalmalıdır.');
       run('UPDATE tasks SET owner=NULL WHERE owner=?',target.id);
       run('UPDATE comments SET author=NULL WHERE author=?',target.id);
+      run('DELETE FROM notes WHERE user=?',target.id);
       run('DELETE FROM sessions WHERE user=?',target.id);
       run('DELETE FROM users WHERE id=?',target.id);
       break;
@@ -166,12 +168,56 @@ function change(action,b,u){
     case 'task':{
       staff(u);
       if(!one('SELECT id FROM projects WHERE id=? AND company=?',Number(b.project),u.company))fail('Layihə seçin.');
-      const owner=b.owner?Number(b.owner):null;
-      if(owner&&!one('SELECT id FROM users WHERE id=? AND company=? AND active=1',owner,u.company))fail('Aktiv əməkdaş seçin.');
       const due=b.due||'';if(due&&(!/^\d{4}-\d{2}-\d{2}$/.test(due)||isNaN(Date.parse(due))||new Date(due).toISOString().slice(0,10)!==due))fail('Tarixi yoxlayın.');
-      const args=[str(b.title,200),b.details?str(b.details,5000):'',Number(b.project),owner,choose(b.status,statuses),choose(b.priority,priorities),due];
-      if(b.id){task(b.id,u.company);if(!run('UPDATE tasks SET title=?,details=?,project=?,owner=?,status=?,priority=?,due=?,version=version+1 WHERE id=? AND version=?',...args,b.id,b.version).changes)fail('Tapşırıq dəyişib. Yeniləyib təkrar açın.',409);}
-      else insert('INSERT INTO tasks(title,details,project,owner,status,priority,due) VALUES(?,?,?,?,?,?,?)',...args);
+      const status=choose(b.status,statuses);
+      const priority=choose(b.priority,priorities);
+      const title=str(b.title,200);
+      const details=b.details?str(b.details,5000):'';
+      const project=Number(b.project);
+      if(b.id){
+        task(b.id,u.company);
+        const owner=b.owner?Number(b.owner):(Array.isArray(b.owners)&&b.owners[0]?Number(b.owners[0]):null);
+        if(!owner||!one('SELECT id FROM users WHERE id=? AND company=? AND active=1',owner,u.company))fail('Aktiv məsul şəxs seçin.');
+        if(!run('UPDATE tasks SET title=?,details=?,project=?,owner=?,status=?,priority=?,due=?,version=version+1 WHERE id=? AND version=?',title,details,project,owner,status,priority,due,b.id,b.version).changes)fail('Tapşırıq dəyişib. Yeniləyib təkrar açın.',409);
+      }else{
+        let owners=[];
+        if(Array.isArray(b.owners)){
+          owners=b.owners.map(Number).filter(id=>Number.isSafeInteger(id)&&id>0);
+        }else if(b.owner){
+          owners=[Number(b.owner)];
+        }
+        owners=[...new Set(owners)];
+        if(!owners.length)fail('Tapşırıq üçün ən azı bir məsul şəxs seçilməlidir.');
+        for(const o of owners){
+          if(!one('SELECT id FROM users WHERE id=? AND company=? AND active=1',o,u.company))fail('Seçilən əməkdaş aktiv olmalıdır.');
+        }
+        for(const o of owners){
+          insert('INSERT INTO tasks(title,details,project,owner,status,priority,due) VALUES(?,?,?,?,?,?,?)',title,details,project,o,status,priority,due);
+        }
+      }
+      break;
+    }
+    case 'note':{
+      const content=str(b.content,10000);
+      const title=b.title?str(b.title,200):'';
+      let date=b.date||null;
+      if(date){
+        date=String(date).trim();
+        if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||isNaN(Date.parse(date))||new Date(date).toISOString().slice(0,10)!==date)fail('Tarixi yoxlayın.');
+      }
+      if(b.id){
+        const existing=one('SELECT id FROM notes WHERE id=? AND user=?',Number(b.id),u.id);
+        if(!existing)fail('Qeyd tapılmadı.',404);
+        run('UPDATE notes SET title=?,content=?,date=? WHERE id=?',title,content,date,existing.id);
+      }else{
+        insert('INSERT INTO notes(user,title,content,date) VALUES(?,?,?,?)',u.id,title,content,date);
+      }
+      break;
+    }
+    case 'deleteNote':{
+      const existing=one('SELECT id FROM notes WHERE id=? AND user=?',Number(b.id),u.id);
+      if(!existing)fail('Qeyd tapılmadı.',404);
+      run('DELETE FROM notes WHERE id=?',existing.id);
       break;
     }
     case 'status':case 'comment':case 'deleteTask':{

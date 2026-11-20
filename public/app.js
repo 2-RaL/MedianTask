@@ -12,7 +12,18 @@ const app=createApp({
     autoFillUsers,
   };
  },
- data:()=>({s:null,ready:false,demo:false,busy:false,error:'',toast:'',timer:null,page:'board',mobile:false,auth:{email:'',password:''},view:'board',query:'',project:'',priority:'',companyFilter:'',modal:'',form:{},note:'',drag:null,over:'',statuses:{todo:'Planlaşdırılıb',doing:'İcradadır',review:'Yoxlamada',done:'Tamamlanıb'},priorities:{low:'Aşağı',normal:'Orta',high:'Yüksək'},demos:[['Şirkət admini','leyla'],['Platforma admini','platform'],['İstifadəçi','murad']]}),
+ data:()=>({
+  s:null,ready:false,demo:false,busy:false,error:'',toast:'',timer:null,page:'board',mobile:false,
+  auth:{email:'',password:''},view:'board',query:'',project:'',priority:'',companyFilter:'',modal:'',form:{},note:'',drag:null,over:'',
+  statuses:{todo:'Planlaşdırılıb',doing:'İcradadır',review:'Yoxlamada',done:'Tamamlanıb'},
+  priorities:{low:'Aşağı',normal:'Orta',high:'Yüksək'},
+  demos:[['Şirkət admini','leyla'],['Platforma admini','platform'],['İstifadəçi','murad']],
+  calYear:new Date().getFullYear(),
+  calMonth:new Date().getMonth(),
+  selectedDate:new Date().toISOString().slice(0,10),
+  newDateNote:{title:'',content:''},
+  newFreeNote:{title:'',content:''}
+ }),
  computed:{
   isPlatform(){return this.s?.me.role==='platform'},admin(){return this.s?.me.role==='admin'},
   nav(){
@@ -20,6 +31,7 @@ const app=createApp({
     return [
       ['board','Tapşırıq lövhəsi','board'],
       ['mine','Mənim tapşırıqlarım','check'],
+      ['notes','Qeydlər','date'],
       ['reports','Hesabatlar','report'],
       ...(this.admin?[['team','Komanda','team']]:[])
     ];
@@ -32,6 +44,7 @@ const app=createApp({
     return {
       board:'Layihələr üzrə tapşırıqlar və onların icra vəziyyəti.',
       mine:'Sizə həvalə edilmiş tapşırıqlar və son tarixlər.',
+      notes:'Şəxsi təqvim qeydləri, xatırlatmalar və sərbəst qeydlər.',
       reports:reportsSub,
       companies:'Şirkətlərin paketləri, administratorları və istifadəçi yerləri.',
       plans:'Şirkətlər üçün standart paketlər və istifadəçi limitləri.',
@@ -39,6 +52,91 @@ const app=createApp({
     }[this.page];
   },
   today(){return new Date().toLocaleDateString('az-AZ',{weekday:'long',day:'numeric',month:'long'})},
+  todayDateStr(){
+    const now=new Date();
+    return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+  },
+  activeUsers(){
+    return this.s?.users?.filter(u=>u.active)||[];
+  },
+  userNotes(){
+    return this.s?.notes||[];
+  },
+  todayNotes(){
+    return this.userNotes.filter(n=>n.date===this.todayDateStr);
+  },
+  selectedDateNotes(){
+    return this.userNotes.filter(n=>n.date===this.selectedDate);
+  },
+  freeNotes(){
+    return this.userNotes.filter(n=>!n.date);
+  },
+  notesMetrics(){
+    return [
+      ['Bugünkü qeydlər',this.todayNotes.length,'clock',this.todayNotes.length?'Bugünə aid xatırlatmalar':'Qeyd yoxdur'],
+      ['Seçilmiş gün üçün',this.selectedDateNotes.length,'date',this.formatDateAz(this.selectedDate)],
+      ['Sərbəst qeydlər',this.freeNotes.length,'list','Təqvimdən kənar daimi qeydlər'],
+      ['Cəmi qeydlər',this.userNotes.length,'board','Bütün şəxsi qeydlər']
+    ];
+  },
+  calMonthName(){
+    const months=['Yanvar','Fevral','Mart','Aprel','May','İyun','İyul','Avqust','Sentyabr','Oktyabr','Noyabr','Dekabr'];
+    return months[this.calMonth]+' '+this.calYear;
+  },
+  weekDays(){
+    return ['B.e','Ç.a','Ç.','C.a','C.','Ş.','B.'];
+  },
+  calendarDays(){
+    const y=this.calYear;
+    const m=this.calMonth;
+    const firstDayOfWeek=(new Date(y,m,1).getDay()+6)%7;
+    const daysInMonth=new Date(y,m+1,0).getDate();
+    const daysInPrevMonth=new Date(y,m,0).getDate();
+    const days=[];
+    const notes=this.userNotes;
+
+    for(let i=firstDayOfWeek-1;i>=0;i--){
+      const dayNum=daysInPrevMonth-i;
+      const prevDate=new Date(y,m-1,dayNum);
+      const dateStr=`${prevDate.getFullYear()}-${String(prevDate.getMonth()+1).padStart(2,'0')}-${String(prevDate.getDate()).padStart(2,'0')}`;
+      days.push({
+        dayNum,
+        dateStr,
+        isCurrentMonth:false,
+        isToday:dateStr===this.todayDateStr,
+        isSelected:dateStr===this.selectedDate,
+        notesCount:notes.filter(n=>n.date===dateStr).length
+      });
+    }
+
+    for(let d=1;d<=daysInMonth;d++){
+      const dateStr=`${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      days.push({
+        dayNum:d,
+        dateStr,
+        isCurrentMonth:true,
+        isToday:dateStr===this.todayDateStr,
+        isSelected:dateStr===this.selectedDate,
+        notesCount:notes.filter(n=>n.date===dateStr).length
+      });
+    }
+
+    const remaining=(7-(days.length%7))%7;
+    for(let d=1;d<=remaining;d++){
+      const nextDate=new Date(y,m+1,d);
+      const dateStr=`${nextDate.getFullYear()}-${String(nextDate.getMonth()+1).padStart(2,'0')}-${String(nextDate.getDate()).padStart(2,'0')}`;
+      days.push({
+        dayNum:d,
+        dateStr,
+        isCurrentMonth:false,
+        isToday:dateStr===this.todayDateStr,
+        isSelected:dateStr===this.selectedDate,
+        notesCount:notes.filter(n=>n.date===dateStr).length
+      });
+    }
+
+    return days;
+  },
   team(){
     return this.s.users.filter(u=>{
       if(!this.isPlatform||!this.companyFilter)return true;
@@ -135,7 +233,7 @@ const app=createApp({
   },
   platformMetrics(){return [['Şirkətlər',this.s.companies.length,'company'],['Aktiv hesablar',this.s.users.filter(u=>u.active).length,'team'],['Paketlər',this.s.plans.length,'box'],['Boş yerlər',this.s.companies.reduce((n,c)=>n+c.seats-c.used,0),'grid']]},
   current(){return this.s?.tasks?.find(t=>t.id===this.form.id)},
-  actionLabel(){if(this.page==='reports')return 'CSV yüklə';if(!this.admin&&!this.isPlatform)return '';return {board:'Yeni tapşırıq',mine:'Yeni tapşırıq',team:'İstifadəçi əlavə et',companies:'Şirkət əlavə et',plans:'Yeni paket'}[this.page]},
+  actionLabel(){if(this.page==='reports')return 'Excel yüklə';if(this.page==='notes'||(!this.admin&&!this.isPlatform))return '';return {board:'Yeni tapşırıq',mine:'Yeni tapşırıq',team:'İstifadəçi əlavə et',companies:'Şirkət əlavə et',plans:'Yeni paket'}[this.page]},
   modalTitle(){
     if(this.modal==='importUsers')return 'Excel ilə toplu əlavə et';
     if(this.modal==='deleteUser')return 'İstifadəçi silinsin?';
@@ -172,28 +270,69 @@ const app=createApp({
   late(t){const d=new Date();d.setHours(0,0,0,0);return !!t.due&&t.status!=='done'&&new Date(t.due+'T00:00:00')<d},
   percent(id){const t=this.s.tasks.filter(t=>t.project===id);return t.length?Math.round(100*t.filter(t=>t.status==='done').length/t.length):0},
   notify(msg){this.toast=msg;clearTimeout(this.timer);this.timer=setTimeout(()=>this.toast='',3200)},
-  primaryAction(){if(this.page==='reports')return this.csv();if(['board','mine'].includes(this.page))return this.newTask('todo');this.open({plans:'plan',companies:'company',team:'user'}[this.page])},
+  primaryAction(){if(this.page==='reports')return this.excel();if(['board','mine'].includes(this.page))return this.newTask('todo');this.open({plans:'plan',companies:'company',team:'user'}[this.page])},
   newTask(status){if(!this.s.projects.length){this.notify('İlk tapşırıq üçün layihə yaradın.');return this.open('project')}this.open('task',{status})},
   open(type,data={}){
     this.mobile=false;this.error='';this.note='';this.modal=type;
     const initialCompany=(data.company!==undefined&&data.company!==null)?data.company:(this.companyFilter&&this.companyFilter!=='platform'?Number(this.companyFilter):(this.s.companies?.[0]?.id||''));
-    this.form={
-      status:'todo',
-      priority:'normal',
-      project:this.project||this.s.projects?.[0]?.id,
-      owner:this.page==='mine'?this.s.me.id:'',
-      plan:this.s.plans?.[0]?.id,
-      company:initialCompany,
-      role:data.role||(this.isPlatform?'platform':'member'),
-      seats:10,monthly:0,cap:'',
-      ...data,
-      active:data.active!==0
-    };
+    if(type==='task'){
+      if(data.id){
+        this.form={
+          id:data.id,
+          version:data.version,
+          title:data.title,
+          details:data.details||'',
+          project:data.project,
+          owner:data.owner||'',
+          owners:data.owner?[data.owner]:[],
+          status:data.status,
+          priority:data.priority,
+          due:data.due||''
+        };
+      }else{
+        const activeIds=this.activeUsers.map(u=>u.id);
+        const defaultOwner=this.page==='mine'?this.s.me.id:(activeIds.length?activeIds[0]:this.s.me.id);
+        this.form={
+          title:'',
+          details:'',
+          project:this.project||this.s.projects?.[0]?.id||'',
+          owner:defaultOwner,
+          owners:defaultOwner?[defaultOwner]:[],
+          status:data.status||'todo',
+          priority:'normal',
+          due:''
+        };
+      }
+    }else{
+      this.form={
+        status:'todo',
+        priority:'normal',
+        project:this.project||this.s.projects?.[0]?.id,
+        owner:this.page==='mine'?this.s.me.id:'',
+        plan:this.s.plans?.[0]?.id,
+        company:initialCompany,
+        role:data.role||(this.isPlatform?'platform':'member'),
+        seats:10,monthly:0,cap:'',
+        ...data,
+        active:data.active!==0
+      };
+    }
     if(!this.$refs.dialog.open)this.$refs.dialog.showModal();
   },
   close(){this.$refs.dialog?.close();this.modal='';this.error=''},detail(t){this.open('detail',t)},
   async mutate(type,payload,after){if(this.busy)return;this.busy=true;this.error='';try{await this.api(type,payload);this.s=await this.api('state');after?.();this.notify('Dəyişiklik yadda saxlanıldı.')}catch(e){this.error=e.message;if(!this.modal)this.notify(e.message);if(e.status===409){try{this.s=await this.api('state')}catch{}}}finally{this.busy=false}},
-  save(){this.mutate(this.modal,this.form,()=>this.close())},comment(){this.mutate('comment',{id:this.form.id,body:this.note},()=>this.note='')},
+  save(){
+    if(this.modal==='task'){
+      if(!this.form.title?.trim()){this.error='Tapşırığın adını daxil edin.';return;}
+      if(!this.form.project){this.error='Layihə seçin.';return;}
+      if(this.form.id){
+        if(!this.form.owner){this.error='Məsul şəxs seçilməlidir.';return;}
+      }else{
+        if(!this.form.owners||!this.form.owners.length){this.error='Ən azı bir məsul şəxs seçilməlidir.';return;}
+      }
+    }
+    this.mutate(this.modal,this.form,()=>this.close());
+  },comment(){this.mutate('comment',{id:this.form.id,body:this.note},()=>this.note='')},
   async importUsers(){
     if(this.busy)return;
     const file=this.$refs.importFile.files[0];
@@ -238,6 +377,157 @@ const app=createApp({
   },
   move(t,status){if(t.status!==status)this.mutate('status',{id:t.id,version:t.version,status})},
   drop(k){if(this.drag)this.move(this.drag,k);this.drag=null;this.over=''},
+  formatDateAz(d){
+    if(!d)return 'Tarixsiz';
+    const parts=String(d).split('-');
+    if(parts.length===3){
+      const m=['yanvar','fevral','mart','aprel','may','iyun','iyul','avqust','sentyabr','oktyabr','noyabr','dekabr'];
+      return `${parseInt(parts[2],10)} ${m[parseInt(parts[1],10)-1]} ${parts[0]}`;
+    }
+    return d;
+  },
+  prevMonth(){
+    if(this.calMonth===0){this.calMonth=11;this.calYear--;}
+    else{this.calMonth--;}
+  },
+  nextMonth(){
+    if(this.calMonth===11){this.calMonth=0;this.calYear++;}
+    else{this.calMonth++;}
+  },
+  goToday(){
+    const now=new Date();
+    this.calYear=now.getFullYear();
+    this.calMonth=now.getMonth();
+    this.selectedDate=this.todayDateStr;
+  },
+  selectDate(dateStr){
+    this.selectedDate=dateStr;
+  },
+  async addDateNote(){
+    if(!this.newDateNote.content?.trim()){this.notify('Qeyd mətni daxil edin.');return;}
+    await this.mutate('note',{
+      title:this.newDateNote.title?.trim()||'',
+      content:this.newDateNote.content.trim(),
+      date:this.selectedDate
+    },()=>{
+      this.newDateNote.title='';
+      this.newDateNote.content='';
+      this.notify('Təqvim qeydi əlavə edildi.');
+    });
+  },
+  async addFreeNote(){
+    if(!this.newFreeNote.content?.trim()){this.notify('Qeyd mətni daxil edin.');return;}
+    await this.mutate('note',{
+      title:this.newFreeNote.title?.trim()||'',
+      content:this.newFreeNote.content.trim(),
+      date:null
+    },()=>{
+      this.newFreeNote.title='';
+      this.newFreeNote.content='';
+      this.notify('Sərbəst qeyd əlavə edildi.');
+    });
+  },
+  async removeNote(id){
+    await this.mutate('deleteNote',{id},()=>{
+      this.notify('Qeyd silindi.');
+    });
+  },
+  excel(){
+    const tasks=this.page==='reports'?this.reportTasks:(this.page==='mine'?this.baseTasks:this.filtered);
+    const esc=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&apos;');
+    const rowsXml=tasks.map(t=>{
+      const st=this.statuses[t.status]||t.status;
+      const pr=this.priorities[t.priority]||t.priority;
+      const proj=this.projectName(t.project)||'—';
+      const owner=this.person(t.owner);
+      return `   <Row ss:Height="22">
+    <Cell ss:StyleID="CellCenter"><Data ss:Type="Number">${t.id}</Data></Cell>
+    <Cell ss:StyleID="CellText"><Data ss:Type="String">${esc(t.title)}</Data></Cell>
+    <Cell ss:StyleID="CellText"><Data ss:Type="String">${esc(t.details||'')}</Data></Cell>
+    <Cell ss:StyleID="CellText"><Data ss:Type="String">${esc(proj)}</Data></Cell>
+    <Cell ss:StyleID="CellText"><Data ss:Type="String">${esc(owner)}</Data></Cell>
+    <Cell ss:StyleID="CellCenter"><Data ss:Type="String">${esc(st)}</Data></Cell>
+    <Cell ss:StyleID="CellCenter"><Data ss:Type="String">${esc(pr)}</Data></Cell>
+    <Cell ss:StyleID="CellCenter"><Data ss:Type="String">${esc(t.due||'Tarixsiz')}</Data></Cell>
+   </Row>`;
+    }).join('\n');
+
+    const xml=`<?xml version="1.0" encoding="UTF-8"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:o="urn:schemas-microsoft-com:office:office"
+ xmlns:x="urn:schemas-microsoft-com:office:excel"
+ xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:html="http://www.w3.org/TR/REC-html40">
+ <DocumentProperties xmlns="urn:schemas-microsoft-com:office:office">
+  <Title>Meridian Tapşırıqlar Hesabatı</Title>
+  <Created>${new Date().toISOString()}</Created>
+ </DocumentProperties>
+ <Styles>
+  <Style ss:ID="Default" ss:Name="Normal">
+   <Alignment ss:Vertical="Center"/>
+   <Borders/>
+   <Font ss:FontName="Segoe UI" ss:Size="10" ss:Color="#1A202C"/>
+   <Interior/>
+   <NumberFormat/>
+   <Protection/>
+  </Style>
+  <Style ss:ID="Header">
+   <Alignment ss:Horizontal="Center" ss:Vertical="Center"/>
+   <Borders>
+    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="2" ss:Color="#0B2818"/>
+   </Borders>
+   <Font ss:FontName="Segoe UI" ss:Size="11" ss:Bold="1" ss:Color="#FFFFFF"/>
+   <Interior ss:Color="#14452B" ss:Pattern="Solid"/>
+  </Style>
+  <Style ss:ID="CellText">
+   <Alignment ss:Vertical="Center"/>
+   <Borders>
+    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#E2E8F0"/>
+   </Borders>
+   <Font ss:FontName="Segoe UI" ss:Size="10"/>
+  </Style>
+  <Style ss:ID="CellCenter">
+   <Alignment ss:Horizontal="Center" ss:Vertical="Center"/>
+   <Borders>
+    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#E2E8F0"/>
+   </Borders>
+   <Font ss:FontName="Segoe UI" ss:Size="10"/>
+  </Style>
+ </Styles>
+ <Worksheet ss:Name="Tapşırıqlar">
+  <Table>
+   <Column ss:Width="45"/>
+   <Column ss:Width="200"/>
+   <Column ss:Width="240"/>
+   <Column ss:Width="140"/>
+   <Column ss:Width="140"/>
+   <Column ss:Width="105"/>
+   <Column ss:Width="95"/>
+   <Column ss:Width="95"/>
+   <Row ss:Height="28">
+    <Cell ss:StyleID="Header"><Data ss:Type="String">№</Data></Cell>
+    <Cell ss:StyleID="Header"><Data ss:Type="String">Tapşırıq</Data></Cell>
+    <Cell ss:StyleID="Header"><Data ss:Type="String">Təsvir</Data></Cell>
+    <Cell ss:StyleID="Header"><Data ss:Type="String">Layihə</Data></Cell>
+    <Cell ss:StyleID="Header"><Data ss:Type="String">Məsul şəxs</Data></Cell>
+    <Cell ss:StyleID="Header"><Data ss:Type="String">Mərhələ</Data></Cell>
+    <Cell ss:StyleID="Header"><Data ss:Type="String">Prioritet</Data></Cell>
+    <Cell ss:StyleID="Header"><Data ss:Type="String">Son tarix</Data></Cell>
+   </Row>
+${rowsXml}
+  </Table>
+ </Worksheet>
+</Workbook>`;
+
+    const blob=new Blob([xml],{type:'application/vnd.ms-excel;charset=utf-8'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;
+    a.download=(this.admin?'Meridian-Tapshiriqlar':'Meridian-Ferdi-Hesabat')+'-'+this.todayDateStr+'.xls';
+    a.click();
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+  },
   csv(){const tasks=this.reportTasks;const rows=[['Tapşırıq','Layihə','Məsul şəxs','Mərhələ','Prioritet','Son tarix'],...tasks.map(t=>[t.title,this.projectName(t.project),this.person(t.owner),this.statuses[t.status],this.priorities[t.priority],t.due])];const quote=v=>'"'+String(v||'').replace(/^[\s]*[=+@-]/,m=>"'"+m).replaceAll('"','""')+'"';const url=URL.createObjectURL(new Blob(['\uFEFF'+rows.map(r=>r.map(quote).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download=(this.admin?'Meridian-Umumi-Hesabat.csv':'Meridian-Ferdi-Hesabat.csv');a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}
  }
 });

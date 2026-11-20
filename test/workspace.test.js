@@ -41,6 +41,15 @@ test('Şirkətlər, limitlər, səlahiyyətlər və tapşırıqlar',async t=>{
   await post('comment',m,{id:1,body:'Hazırdır'});assert.equal((await state(a)).comments.length,1);
   await post('user',a,{...member,active:false,password:''});assert.equal((await req('state',m)).status,401);
   await post('deleteTask',a,{id:1,version:2});assert.equal((await state(a)).comments.length,0);
+  await post('task',a,{title:'Xəta',details:'',project:1,status:'todo',owners:[]},400);
+  await post('note',a,{title:'Qeyd 1',content:'Təqvim qeydi',date:'2026-11-25'});
+  await post('note',a,{title:'Sərbəst qeyd',content:'Fikirlər'});
+  const notesAfter=(await state(a)).notes;
+  assert.equal(notesAfter.length,2);
+  assert.equal(notesAfter.find(n=>n.title==='Qeyd 1').date,'2026-11-25');
+  assert.equal(notesAfter.find(n=>n.title==='Sərbəst qeyd').date,null);
+  await post('deleteNote',a,{id:notesAfter[0].id});
+  assert.equal((await state(a)).notes.length,1);
   const importRows=[
     {line:2,name:'Excel Member',email:'excel-member@test.local',password},
     {line:4,name:'Excel Admin',email:'excel-admin@test.local',password,role:'admin'},
