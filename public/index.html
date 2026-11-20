@@ -390,14 +390,110 @@
       <h4>＋ {{formatDateAz(selectedDate)}} üçün qeyd</h4>
       <input type="text" v-model="newDateNote.title" placeholder="Başlıq (istəyə görə)" maxlength="200">
       <textarea v-model="newDateNote.content" placeholder="Qeyd və ya xatırlatmanızı daxil edin..." rows="2" maxlength="10000"></textarea>
-      <div class="note-share-select" v-if="shareableUsers.length">
-        <small class="share-label"><ico name="share"></ico> Başqaları ilə paylaş (istəyə görə):</small>
-        <div class="note-share-chips">
-          <label v-for="u in shareableUsers" :key="u.id" class="share-user-chip" :class="{selected: newDateNote.shared_with.includes(u.id)}">
-            <input type="checkbox" :value="u.id" v-model="newDateNote.shared_with">
-            <b :class="'avatar v'+(u.id%4)">{{initials(u.name)}}</b>
-            <span>{{u.name}}</span>
+      <!-- Başqaları ilə paylaş toggle düyməsi -->
+      <div class="note-share-toggle-row">
+        <button
+          type="button"
+          class="btn-toggle-share"
+          :class="{active: showDateSharePicker, 'has-selected': newDateNote.shared_with.length}"
+          @click="toggleDateSharePicker"
+        >
+          <span class="btn-toggle-share-main">
+            <ico name="share"></ico>
+            <span>Başqaları ilə paylaş</span>
+            <span v-if="newDateNote.shared_with.length" class="share-count-tag">{{newDateNote.shared_with.length}} seçilib</span>
+          </span>
+          <span class="share-toggle-caret">{{showDateSharePicker ? '▲ Bağla' : '▼ Seç / Aç'}}</span>
+        </button>
+      </div>
+
+      <!-- Bağlı olanda seçilmişlərin xülasəsi -->
+      <div v-if="!showDateSharePicker && newDateNote.shared_with.length" class="share-summary-row">
+        <span class="summary-label"><ico name="share"></ico> Paylaşılacaq:</span>
+        <div class="summary-chips">
+          <span v-for="uid in newDateNote.shared_with" :key="uid" class="summary-chip">
+            {{person(uid)}}
+            <button type="button" @click="removeNewNoteShareUser(uid)" title="Çıxar">×</button>
+          </span>
+        </div>
+      </div>
+
+      <!-- Açılan pəncərə / bölmə -->
+      <div v-if="showDateSharePicker" class="share-picker-panel">
+        <div class="share-picker-top">
+          <div class="share-picker-title">
+            <ico name="share"></ico>
+            <strong>Qeydi başqaları ilə paylaş</strong>
+          </div>
+          <button type="button" class="btn-picker-close" @click="showDateSharePicker=false" title="Paneli bağla">✕</button>
+        </div>
+
+        <div class="share-controls-grid">
+          <!-- Qurum / Şirkət seçimi -->
+          <label class="share-ctrl-field">
+            <span>Qurum / Şirkət:</span>
+            <select v-model="noteShareCompany" class="share-select-input">
+              <option value="">{{isPlatform ? 'Bütün qurumlar və şirkətlər' : (s.company?.name || 'Cari şirkət')}}</option>
+              <option v-if="isPlatform" value="platform">Platforma (Super adminlər)</option>
+              <option v-for="c in s.companies" :key="c.id" :value="c.id">{{c.name}}</option>
+            </select>
           </label>
+
+          <!-- Search hissəsi -->
+          <label class="share-ctrl-field">
+            <span>Əməkdaş axtarışı:</span>
+            <div class="share-search-box">
+              <ico name="search"></ico>
+              <input
+                type="search"
+                v-model="noteShareSearch"
+                placeholder="Axtarılan şəxsin adını yazın..."
+                autocomplete="off"
+              >
+              <button v-if="noteShareSearch" type="button" class="btn-clear-txt" @click="noteShareSearch=''">✕</button>
+            </div>
+          </label>
+        </div>
+
+        <!-- Seçilmiş şəxslər (varsa) -->
+        <div v-if="newDateNote.shared_with.length" class="share-selected-ribbon">
+          <small>Seçilmiş əməkdaşlar ({{newDateNote.shared_with.length}}):</small>
+          <div class="share-selected-chips">
+            <span v-for="uid in newDateNote.shared_with" :key="uid" class="selected-pill">
+              <b :class="'avatar v'+(uid%4)">{{initials(person(uid))}}</b>
+              <span>{{person(uid)}}</span>
+              <button type="button" class="pill-x" @click="removeNewNoteShareUser(uid)" title="Çıxar">✕</button>
+            </span>
+            <button type="button" class="btn-clear-link" @click="newDateNote.shared_with=[]">Təmizlə</button>
+          </div>
+        </div>
+
+        <!-- Axtarış nəticəsi və ya uyğun əməkdaşların siyahısı -->
+        <div class="share-results-area">
+          <div v-if="filteredNoteShareUsers.length" class="share-candidates-list">
+            <label
+              v-for="u in filteredNoteShareUsers"
+              :key="u.id"
+              class="share-user-check-item"
+              :class="{selected: newDateNote.shared_with.includes(u.id)}"
+            >
+              <input type="checkbox" :value="u.id" v-model="newDateNote.shared_with">
+              <b :class="'avatar v'+(u.id%4)">{{initials(u.name)}}</b>
+              <div class="user-info-col">
+                <strong>{{u.name}}</strong>
+                <small>
+                  <span v-if="isPlatform && u.company">{{companyName(u.company)}} · </span>
+                  <span>{{roleName(u.role)}}</span>
+                  <span v-if="u.email"> · {{u.email}}</span>
+                </small>
+              </div>
+            </label>
+          </div>
+          <div v-else class="share-empty-hint">
+            <p v-if="noteShareSearch.trim()">“{{noteShareSearch}}” adına uyğun əməkdaş tapılmadı.</p>
+            <p v-else-if="isPlatform && !noteShareCompany">Əməkdaşları axtarmaq üçün adını qeyd edin və ya qurum seçin.</p>
+            <p v-else>Paylaşmaq üçün uyğun əməkdaş tapılmadı.</p>
+          </div>
         </div>
       </div>
       <button type="button" class="primary" :disabled="busy || !newDateNote.content.trim()" @click="addDateNote">Qeydi əlavə et</button>
@@ -448,16 +544,79 @@
 </section></main></div>
 <dialog ref="dialog" @cancel="modal=''" @close="modal=''"><div v-if="modal" class="modalinner"><div class="modalhead"><small>{{s.company?.name||'MERIDIAN'}}</small><button aria-label="Bağla" @click="close">×</button></div><h2>{{modalTitle}}</h2><template v-if="modal==='detail' && current"><div v-if="current.group_id" class="task-dept-badge"><ico name="folder"></ico><span><strong>{{current.group_name || 'Şöbə'}}</strong> departamentinin tapşırığı</span></div><small>{{projectName(current.project)}} · № {{current.id}}</small><p class="desc">{{current.details||'Təsvir əlavə edilməyib.'}}</p><div class="facts"><span>Məsul şəxs<b>{{person(current.owner)}}</b></span><span>Son tarix<b>{{dateLabel(current.due)}}</b></span><span>Prioritet<b>{{priorities[current.priority]}}</b></span></div><div v-if="current.group_id && isCurrentGroupLead" class="delegate-box"><div class="delegate-box-head"><ico name="share"></ico><div><strong>Şöbə əməkdaşlarına təhkim et / yönləndir</strong><small>Tapşırığı komanda üzvlərinizə ötürün və ya özünüz icra edin.</small></div></div><div class="assignee-picker"><label v-for="u in currentGroupMembers" :key="u.id" class="assignee-item" :class="{selected: delegateOwners.includes(u.id)}"><input type="checkbox" :value="u.id" v-model="delegateOwners"><b :class="'avatar v'+(u.id%4)">{{initials(u.name)}}</b><span>{{u.name}} <small v-if="u.id===s.me.id">(Siz / Rəhbər)</small></span></label></div><button type="button" class="primary" style="margin-top:10px;" :disabled="busy || !delegateOwners.length" @click="delegateCurrentTask"><ico name="check"></ico> Seçilmiş əməkdaşa təhkim et</button></div><label>Mərhələ<select :value="current.status" :disabled="busy||(!admin&&!isPlatform&&current.owner!==s.me.id&&!isCurrentGroupLead)" @change="move(current,$event.target.value)"><option v-for="(n,k) in statuses" :value="k">{{n}}</option></select></label><div v-if="admin || isPlatform || isCurrentGroupLead" class="detailactions"><button @click="open('task',current)">Redaktə et</button><button v-if="admin || isPlatform" @click="open('deleteTask',current)">Sil</button></div><hr><h3>Şərhlər</h3><article v-for="c in s.comments.filter(c=>c.task===current.id)" class="comment"><strong>{{person(c.author)}}</strong><small>{{c.created}} UTC</small><p>{{c.body}}</p></article><form @submit.prevent="comment"><label>Yeni şərh<textarea v-model="note" required maxlength="3000" rows="2"></textarea></label><button class="primary" :disabled="busy">Şərhi göndər</button></form></template>
 <div v-else-if="modal==='shareNote'" class="share-modal-body">
-  <p>“<strong>{{sharingNote?.title || 'Təqvim qeydi'}}</strong>” qeydini kimlərlə paylaşmaq istəyirsiniz?</p>
-  <div class="assignee-picker">
-    <label v-for="u in shareableUsers" :key="u.id" class="assignee-item" :class="{selected: shareUserIds.includes(u.id)}">
-      <input type="checkbox" :value="u.id" v-model="shareUserIds">
-      <b :class="'avatar v'+(u.id%4)">{{initials(u.name)}}</b>
-      <span>{{u.name}} <small>({{roleName(u.role)}})</small></span>
+  <p class="share-modal-lead">
+    “<strong>{{sharingNote?.title || 'Təqvim qeydi'}}</strong>” qeydini kimlərlə bölüşmək istəyirsiniz?
+  </p>
+
+  <div class="share-controls-grid">
+    <!-- Qurum / Şirkət seçimi -->
+    <label class="share-ctrl-field">
+      <span>Qurum / Şirkət:</span>
+      <select v-model="modalShareCompany" class="share-select-input">
+        <option value="">{{isPlatform ? 'Bütün qurumlar və şirkətlər' : (s.company?.name || 'Cari şirkət')}}</option>
+        <option v-if="isPlatform" value="platform">Platforma (Super adminlər)</option>
+        <option v-for="c in s.companies" :key="c.id" :value="c.id">{{c.name}}</option>
+      </select>
+    </label>
+
+    <!-- Search hissəsi -->
+    <label class="share-ctrl-field">
+      <span>Əməkdaş axtarışı:</span>
+      <div class="share-search-box">
+        <ico name="search"></ico>
+        <input
+          type="search"
+          v-model="modalShareSearch"
+          placeholder="Axtarılan şəxsin adını yazın..."
+          autocomplete="off"
+        >
+        <button v-if="modalShareSearch" type="button" class="btn-clear-txt" @click="modalShareSearch=''">✕</button>
+      </div>
     </label>
   </div>
-  <p v-if="!shareableUsers.length" class="emptyLane">Paylaşmaq üçün aktiv istifadəçi tapılmadı.</p>
-  <div class="end">
+
+  <!-- Seçilmiş şəxslər (varsa) -->
+  <div v-if="shareUserIds.length" class="share-selected-ribbon">
+    <small>Seçilmiş əməkdaşlar ({{shareUserIds.length}}):</small>
+    <div class="share-selected-chips">
+      <span v-for="uid in shareUserIds" :key="uid" class="selected-pill">
+        <b :class="'avatar v'+(uid%4)">{{initials(person(uid))}}</b>
+        <span>{{person(uid)}}</span>
+        <button type="button" class="pill-x" @click="removeModalShareUser(uid)" title="Çıxar">✕</button>
+      </span>
+      <button type="button" class="btn-clear-link" @click="shareUserIds=[]">Təmizlə</button>
+    </div>
+  </div>
+
+  <!-- Axtarış nəticələri / Siyahı -->
+  <div class="share-results-area modal-scroll-area">
+    <div v-if="filteredModalShareUsers.length" class="share-candidates-list">
+      <label
+        v-for="u in filteredModalShareUsers"
+        :key="u.id"
+        class="share-user-check-item"
+        :class="{selected: shareUserIds.includes(u.id)}"
+      >
+        <input type="checkbox" :value="u.id" v-model="shareUserIds">
+        <b :class="'avatar v'+(u.id%4)">{{initials(u.name)}}</b>
+        <div class="user-info-col">
+          <strong>{{u.name}}</strong>
+          <small>
+            <span v-if="isPlatform && u.company">{{companyName(u.company)}} · </span>
+            <span>{{roleName(u.role)}}</span>
+            <span v-if="u.email"> · {{u.email}}</span>
+          </small>
+        </div>
+      </label>
+    </div>
+    <div v-else class="share-empty-hint">
+      <p v-if="modalShareSearch.trim()">“{{modalShareSearch}}” adına uyğun əməkdaş tapılmadı.</p>
+      <p v-else-if="isPlatform && !modalShareCompany">Əməkdaşları axtarmaq üçün adını qeyd edin və ya qurum seçin.</p>
+      <p v-else>Paylaşmaq üçün uyğun əməkdaş tapılmadı.</p>
+    </div>
+  </div>
+
+  <div class="end modal-actions">
     <button type="button" @click="close">Ləğv et</button>
     <button type="button" class="primary" :disabled="busy" @click="saveShareNote">Yadda saxla</button>
   </div>

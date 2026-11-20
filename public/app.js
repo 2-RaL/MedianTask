@@ -22,9 +22,14 @@ const app=createApp({
   calMonth:new Date().getMonth(),
   selectedDate:new Date().toISOString().slice(0,10),
   newDateNote:{title:'',content:'',shared_with:[]},
+  showDateSharePicker:false,
+  noteShareCompany:'',
+  noteShareSearch:'',
   newFreeNote:{title:'',content:''},
   sharingNote:null,
   shareUserIds:[],
+  modalShareCompany:'',
+  modalShareSearch:'',
   teamTab:'members',
   taskTarget:'users',
   delegateOwners:[]
@@ -180,13 +185,54 @@ const app=createApp({
     }
     return this.s.projects;
   },
-  shareableUsers(){
+  shareableBaseUsers(){
     const myId=this.s?.me?.id;
     let list=(this.s?.users||[]).filter(u=>u.active&&u.id!==myId);
     if(!this.isPlatform&&this.s?.me?.company){
       list=list.filter(u=>u.company===this.s.me.company);
-    }else if(this.isPlatform&&this.companyFilter&&this.companyFilter!=='platform'){
-      list=list.filter(u=>u.company===Number(this.companyFilter));
+    }
+    return list;
+  },
+  shareableUsers(){
+    return this.shareableBaseUsers;
+  },
+  filteredNoteShareUsers(){
+    let list=this.shareableBaseUsers;
+    if(this.noteShareCompany==='platform'){
+      list=list.filter(u=>u.role==='platform');
+    }else if(this.noteShareCompany){
+      list=list.filter(u=>u.company===Number(this.noteShareCompany));
+    }
+    const q=(this.noteShareSearch||'').trim().toLocaleLowerCase('az');
+    if(q){
+      return list.filter(u=>{
+        const nm=u.name&&u.name.toLocaleLowerCase('az').includes(q);
+        const em=u.email&&u.email.toLocaleLowerCase('az').includes(q);
+        return nm||em;
+      });
+    }
+    if(this.isPlatform&&!this.noteShareCompany){
+      return [];
+    }
+    return list;
+  },
+  filteredModalShareUsers(){
+    let list=this.shareableBaseUsers;
+    if(this.modalShareCompany==='platform'){
+      list=list.filter(u=>u.role==='platform');
+    }else if(this.modalShareCompany){
+      list=list.filter(u=>u.company===Number(this.modalShareCompany));
+    }
+    const q=(this.modalShareSearch||'').trim().toLocaleLowerCase('az');
+    if(q){
+      return list.filter(u=>{
+        const nm=u.name&&u.name.toLocaleLowerCase('az').includes(q);
+        const em=u.email&&u.email.toLocaleLowerCase('az').includes(q);
+        return nm||em;
+      });
+    }
+    if(this.isPlatform&&!this.modalShareCompany){
+      return [];
     }
     return list;
   },
@@ -531,8 +577,22 @@ const app=createApp({
   openShareModal(n){
     this.sharingNote=n;
     this.shareUserIds=[...(n.shared_with||[])];
+    this.modalShareCompany=this.isPlatform?'':(this.s?.me?.company||'');
+    this.modalShareSearch='';
     this.modal='shareNote';
     if(!this.$refs.dialog.open)this.$refs.dialog.showModal();
+  },
+  toggleDateSharePicker(){
+    this.showDateSharePicker=!this.showDateSharePicker;
+    if(this.showDateSharePicker&&!this.isPlatform&&!this.noteShareCompany&&this.s?.me?.company){
+      this.noteShareCompany=this.s.me.company;
+    }
+  },
+  removeNewNoteShareUser(uid){
+    this.newDateNote.shared_with=(this.newDateNote.shared_with||[]).filter(id=>id!==uid);
+  },
+  removeModalShareUser(uid){
+    this.shareUserIds=(this.shareUserIds||[]).filter(id=>id!==uid);
   },
   async saveShareNote(){
     if(!this.sharingNote)return;
@@ -646,6 +706,8 @@ const app=createApp({
       this.newDateNote.title='';
       this.newDateNote.content='';
       this.newDateNote.shared_with=[];
+      this.showDateSharePicker=false;
+      this.noteShareSearch='';
       this.notify('Təqvim qeydi əlavə edildi.');
     });
   },
