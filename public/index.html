@@ -95,7 +95,7 @@
 </div>
 <div v-if="demo" class="demobox"><small>DEMO HESABI İLƏ SÜRƏTLİ GİRİŞ</small><div><button v-for="o in demos" :key="o[1]" type="button" @click="demoLogin(o[1])" :disabled="busy">{{o[0]}}</button></div></div></section></div>
 <div v-else class="shell"><aside :class="{opened:mobile}"><img class="brand" src="/meridian-logo.png" alt="MERİDİAN" width="2172" height="724"><div class="space"><b class="monogram">{{initials(s.company?.name||'Meridian')}}</b><div><strong>{{s.company?.name||'Meridian'}}</strong><small>{{isPlatform?'Platforma paneli':'Şirkət məkanı'}}</small></div></div><small class="navcaption">İDARƏETMƏ</small><nav><button v-for="n in nav" @click="go(n[0])" :class="{current:page===n[0]}"><ico :name="n[2]"></ico>{{n[1]}}</button></nav>
-<div v-if="!isPlatform || s.projects?.length" class="sideProjects"><small class="navcaption">LAYİHƏLƏR</small><div v-for="(p,i) in availableProjects" :key="p.id" class="sideProjectItem" :class="{selected:project===p.id}"><button type="button" class="sideProjectBtn" @click="go('board');project=p.id" :title="p.name"><i :class="'dot tone'+i%4"></i><span>{{p.name}}</span></button><button v-if="admin || isPlatform" type="button" class="sideProjectEdit" @click.stop="openProjectEdit(p.id)" title="Layihə adını redaktə et">✎</button></div><button v-if="admin || isPlatform" class="sideProjectAdd" @click="open('project')">＋ Layihə yarat</button></div><div class="sidefoot"><button type="button" class="sidefoot-profile" @click="open('profile')" title="Profil məlumatlarını redaktə et"><b class="avatar">{{initials(s.me.name)}}</b><div><strong>{{s.me.name}}</strong><small>{{roleName(s.me.role)}} ✎</small></div></button><button class="logout" title="Çıxış" aria-label="Çıxış" @click="logout"><ico name="logout"></ico></button></div></aside><button v-if="mobile" class="scrim" aria-label="Menyunu bağla" @click="mobile=false"></button>
+<div v-if="!isPlatform || s.projects?.length" class="sideProjects"><div class="sideProjectsHead"><small class="navcaption">LAYİHƏLƏR</small><button type="button" class="sideProjectsViewAll" :class="{active: page==='projects'}" @click="go('projects')" title="Bütün layihələri göstər">Hamısı ({{availableProjects.length}})</button></div><div v-for="(p,i) in availableProjects" :key="p.id" class="sideProjectItem" :class="{selected: page==='board' && project===p.id}"><button type="button" class="sideProjectBtn" @click="enterProject(p.id)" :title="p.name"><i :class="'dot tone'+i%4"></i><span>{{p.name}}</span></button><button v-if="admin || isPlatform" type="button" class="sideProjectEdit" @click.stop="openProjectEdit(p.id)" title="Layihə adını redaktə et">✎</button></div><button v-if="admin || isPlatform" class="sideProjectAdd" @click="open('project')">＋ Layihə yarat</button></div><div class="sidefoot"><button type="button" class="sidefoot-profile" @click="open('profile')" title="Profil məlumatlarını redaktə et"><b class="avatar">{{initials(s.me.name)}}</b><div><strong>{{s.me.name}}</strong><small>{{roleName(s.me.role)}} ✎</small></div></button><button class="logout" title="Çıxış" aria-label="Çıxış" @click="logout"><ico name="logout"></ico></button></div></aside><button v-if="mobile" class="scrim" aria-label="Menyunu bağla" @click="mobile=false"></button>
 <main><header><div><button class="menuBtn" @click="mobile=true" aria-label="Menyu"><ico name="menu"></ico></button><ico name="grid"></ico><span>{{isPlatform?'Platforma':'İş məkanı'}}</span><em>/</em><b>{{pageName}}</b></div><span class="today">{{today}}</span></header>
 <section :key="page" class="content">
 <div class="heading"><div><small>{{isPlatform?'PLATFORMA İDARƏETMƏSİ':(s.company?.name ? s.company.name.toLocaleUpperCase('az') : '')}}</small><h1>{{pageName}}</h1><p>{{sub}}</p></div><button v-if="actionLabel" class="primary" @click="primaryAction"><ico name="plus"></ico>{{actionLabel}}</button></div>
@@ -277,6 +277,147 @@
     </div>
   </section>
 </div>
+</template>
+<template v-if="page==='projects'">
+  <!-- Top Metrics Bar -->
+  <div class="metrics">
+    <article v-for="m in projectsMetrics" :key="m[0]">
+      <span><ico :name="m[2]"></ico>{{m[0]}}</span>
+      <strong>{{m[1]}}</strong>
+      <small>{{m[3]}}</small>
+    </article>
+  </div>
+
+  <!-- Super Admin Org Filter Bar -->
+  <div v-if="isPlatform" class="org-filter-bar">
+    <div class="org-filter-label"><ico name="company"></ico><span>Qurumlar üzrə layihələr:</span></div>
+    <div class="org-filter-tabs">
+      <button type="button" :class="{selected: !companyFilter}" @click="setCompanyFilter('')">
+        Bütün qurumlar <span class="tab-count">{{s.projects?.length || 0}}</span>
+      </button>
+      <button type="button" v-for="c in s.companies" :key="c.id" :class="{selected: companyFilter===c.id}" @click="setCompanyFilter(c.id)">
+        {{c.name}} <span class="tab-count">{{companyProjectCount(c.id)}}</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Toolbar with Live Search & Info -->
+  <div class="toolbar projects-toolbar">
+    <div class="filters">
+      <div class="project-search-wrap">
+        <ico name="search"></ico>
+        <input
+          type="search"
+          v-model="projectSearchQuery"
+          placeholder="Layihənin adını axtarın..."
+          aria-label="Layihə axtar"
+        >
+        <button v-if="projectSearchQuery" type="button" class="btn-clear-txt" @click="projectSearchQuery=''">✕</button>
+      </div>
+    </div>
+    <div class="projects-count-badge">
+      <span>Cəmi: <strong>{{allProjectsDetailed.length}}</strong> layihə</span>
+    </div>
+  </div>
+
+  <!-- Interactive Project Cards Grid -->
+  <div v-if="allProjectsDetailed.length" class="projects-grid">
+    <article
+      v-for="p in allProjectsDetailed"
+      :key="p.id"
+      class="project-card-item"
+      @click="enterProject(p.id)"
+      :title="`${p.name} - Layihəyə daxil olmaq üçün klikləyin`"
+    >
+      <div class="project-card-top">
+        <div class="project-card-title-group">
+          <i :class="'dot tone' + p.tone"></i>
+          <div>
+            <h3 class="project-card-name">{{p.name}}</h3>
+            <span v-if="isPlatform && p.company" class="project-card-org">
+              <ico name="company"></ico>{{p.company_name || companyName(p.company)}}
+            </span>
+          </div>
+        </div>
+        <div class="project-card-actions">
+          <button
+            v-if="admin || isPlatform"
+            type="button"
+            class="btn-project-edit-pill"
+            @click.stop="openProjectEdit(p.id)"
+            title="Layihə adını redaktə et"
+          >
+            ✎ Redaktə
+          </button>
+        </div>
+      </div>
+
+      <!-- Progress bar -->
+      <div class="project-card-progress">
+        <div class="progress-labels">
+          <span>İcra vəziyyəti</span>
+          <strong>{{p.pct}}%</strong>
+        </div>
+        <div class="progress-track">
+          <div class="progress-fill" :style="{width: p.pct + '%'}"></div>
+        </div>
+      </div>
+
+      <!-- Task Stats Breakdown -->
+      <div class="project-stats-boxes">
+        <div class="pstat-box">
+          <small>Cəmi</small>
+          <b>{{p.total}}</b>
+        </div>
+        <div class="pstat-box doing">
+          <small>İcradadır</small>
+          <b>{{p.doing}}</b>
+        </div>
+        <div class="pstat-box review">
+          <small>Yoxlamada</small>
+          <b>{{p.review}}</b>
+        </div>
+        <div class="pstat-box done">
+          <small>Tamamlanıb</small>
+          <b>{{p.done}}</b>
+        </div>
+        <div class="pstat-box late" :class="{'is-late': p.late > 0}">
+          <small>Gecikən</small>
+          <b>{{p.late}}</b>
+        </div>
+      </div>
+
+      <!-- Team Members & Action to Enter -->
+      <div class="project-card-bottom">
+        <div class="project-assignees">
+          <template v-if="p.memberIds.length">
+            <b
+              v-for="mId in p.memberIds.slice(0, 4)"
+              :key="mId"
+              :class="'avatar v' + (mId % 4)"
+              :title="person(mId)"
+            >
+              {{initials(person(mId))}}
+            </b>
+            <span v-if="p.memberIds.length > 4" class="assignees-more">+{{p.memberIds.length - 4}}</span>
+          </template>
+          <span v-else class="assignees-empty">Hələ tapşırıq təyin edilməyib</span>
+        </div>
+
+        <button type="button" class="btn-enter-card" @click.stop="enterProject(p.id)">
+          <span>Daxil ol</span>
+          <span class="arrow">→</span>
+        </button>
+      </div>
+    </article>
+  </div>
+
+  <div v-else class="emptyLane project-empty-state">
+    <ico name="folder"></ico>
+    <p v-if="projectSearchQuery">“{{projectSearchQuery}}” adına uyğun layihə tapılmadı.</p>
+    <p v-else>Hələ heç bir layihə yaradılmayıb.</p>
+    <button v-if="admin || isPlatform" type="button" class="primary" @click="open('project')">＋ Yeni layihə yarat</button>
+  </div>
 </template>
 <template v-if="page==='notes'">
 <div class="metrics">

@@ -32,7 +32,8 @@ const app=createApp({
   modalShareSearch:'',
   teamTab:'members',
   taskTarget:'users',
-  delegateOwners:[]
+  delegateOwners:[],
+  projectSearchQuery:''
  }),
  computed:{
   isPlatform(){return this.s?.me.role==='platform'},admin(){return this.s?.me.role==='admin'},
@@ -40,6 +41,7 @@ const app=createApp({
     if(this.isPlatform)return [
       ['board','Tapşırıq lövhəsi','board'],
       ['mine','Mənim tapşırıqlarım','check'],
+      ['projects','Layihələr','folder'],
       ['notes','Qeydlər','date'],
       ['reports','Hesabatlar','report'],
       ['companies','Qurumlar','company'],
@@ -49,6 +51,7 @@ const app=createApp({
     return [
       ['board','Tapşırıq lövhəsi','board'],
       ['mine','Mənim tapşırıqlarım','check'],
+      ['projects','Layihələr','folder'],
       ['notes','Qeydlər','date'],
       ['reports','Hesabatlar','report'],
       ...(this.admin?[['team','Komanda','team']]:[])
@@ -62,6 +65,7 @@ const app=createApp({
     return {
       board:'Layihələr üzrə tapşırıqlar və onların icra vəziyyəti.',
       mine:'Sizə həvalə edilmiş tapşırıqlar və son tarixlər.',
+      projects:'Şirkət və komanda üzrə bütün layihələr, tapşırıqların gedişatı və icra vəziyyəti.',
       notes:'Şəxsi və paylaşılan təqvim qeydləri, xatırlatmalar və sərbəst qeydlər.',
       reports:reportsSub,
       companies:'Qurumların paketləri, administratorları və istifadəçi yerləri.',
@@ -336,7 +340,7 @@ const app=createApp({
   },
   platformMetrics(){return [['Qurumlar',this.s.companies.length,'company'],['Aktiv hesablar',this.s.users.filter(u=>u.active).length,'team'],['Paketlər',this.s.plans.length,'box'],['Boş yerlər',this.s.companies.reduce((n,c)=>n+c.seats-c.used,0),'grid']]},
   current(){return this.s?.tasks?.find(t=>t.id===this.form.id)},
-  actionLabel(){if(this.page==='reports')return 'Excel yüklə';if(this.page==='notes')return '';return (this.admin||this.isPlatform)?{board:'Yeni tapşırıq',mine:'Yeni tapşırıq',team:'İstifadəçi əlavə et',companies:'Qurum əlavə et',plans:'Yeni paket'}[this.page]||'':'';},
+  actionLabel(){if(this.page==='reports')return 'Excel yüklə';if(this.page==='notes')return '';return (this.admin||this.isPlatform)?{board:'Yeni tapşırıq',mine:'Yeni tapşırıq',projects:'Yeni layihə',team:'İstifadəçi əlavə et',companies:'Qurum əlavə et',plans:'Yeni paket'}[this.page]||'':'';},
   modalTitle(){
     if(this.modal==='shareNote')return 'Qeydi paylaş';
     if(this.modal==='profile')return 'Profil məlumatları';
@@ -360,6 +364,35 @@ const app=createApp({
     if(!this.currentGroup)return [];
     const memberIds=this.currentGroup.member_ids||[];
     return (this.s?.users||[]).filter(u=>u.active&&memberIds.includes(u.id));
+  },
+  allProjectsDetailed(){
+    let projs = this.availableProjects;
+    if(this.projectSearchQuery && this.projectSearchQuery.trim()){
+      const q = this.projectSearchQuery.trim().toLocaleLowerCase('az');
+      projs = projs.filter(p => p.name && p.name.toLocaleLowerCase('az').includes(q));
+    }
+    return projs.map((p, i) => {
+      const stats = this.getProjectStats(p.id);
+      return {
+        ...p,
+        tone: i % 4,
+        ...stats
+      };
+    });
+  },
+  projectsMetrics(){
+    const list = this.allProjectsDetailed;
+    const totalProjects = list.length;
+    const totalTasks = list.reduce((sum, p) => sum + p.total, 0);
+    const totalDone = list.reduce((sum, p) => sum + p.done, 0);
+    const totalLate = list.reduce((sum, p) => sum + p.late, 0);
+    const avgRate = totalTasks ? Math.round((totalDone / totalTasks) * 100) : 0;
+    return [
+      ['Cəmi layihə', totalProjects, 'folder', totalProjects + ' aktiv layihə'],
+      ['Tapşırıqlar', totalTasks, 'board', totalTasks ? totalTasks + ' tapşırıq qeydiyyatda' : 'Tapşırıq yoxdur'],
+      ['İcra faizi', `${avgRate}%`, 'check', `${totalDone} tapşırıq icra edilib`],
+      ['Gecikən', totalLate, 'flag', totalLate ? totalLate + ' gecikən tapşırıq var' : 'Qrafikə uyğundur']
+    ];
   }
  },
  async mounted(){
@@ -413,11 +446,33 @@ const app=createApp({
     const p=this.s?.projects?.find(x=>x.id===Number(id));
     if(p)this.open('project',p);
   },
+  enterProject(pId){
+    this.page='board';
+    this.project=pId;
+    this.priority='';
+    this.query='';
+    this.mobile=false;
+  },
+  companyProjectCount(cid){
+    return this.s?.projects?.filter(p=>p.company===Number(cid)).length || 0;
+  },
+  getProjectStats(pId){
+    const tasks=(this.s?.tasks||[]).filter(t=>t.project===pId);
+    const total=tasks.length;
+    const done=tasks.filter(t=>t.status==='done').length;
+    const doing=tasks.filter(t=>t.status==='doing').length;
+    const review=tasks.filter(t=>t.status==='review').length;
+    const todo=tasks.filter(t=>t.status==='todo').length;
+    const late=tasks.filter(this.late).length;
+    const pct=total?Math.round((done/total)*100):0;
+    const memberIds=[...new Set(tasks.map(t=>t.owner).filter(Boolean))];
+    return {total,done,doing,review,todo,late,pct,memberIds};
+  },
   dateLabel(d){return d?new Date(d+'T12:00:00').toLocaleDateString('az-AZ',{day:'numeric',month:'short'}):'Tarixsiz'},
   late(t){const d=new Date();d.setHours(0,0,0,0);return !!t.due&&t.status!=='done'&&new Date(t.due+'T00:00:00')<d},
   percent(id){const t=this.s.tasks.filter(t=>t.project===id);return t.length?Math.round(100*t.filter(t=>t.status==='done').length/t.length):0},
   notify(msg){this.toast=msg;clearTimeout(this.timer);this.timer=setTimeout(()=>this.toast='',3200)},
-  primaryAction(){if(this.page==='reports')return this.excel();if(['board','mine'].includes(this.page))return this.newTask('todo');this.open({plans:'plan',companies:'company',team:'user'}[this.page])},
+  primaryAction(){if(this.page==='reports')return this.excel();if(['board','mine'].includes(this.page))return this.newTask('todo');this.open({plans:'plan',companies:'company',team:'user',projects:'project'}[this.page])},
   newTask(status){
     const projs=this.availableProjects;
     if(!this.isPlatform&&(!projs||!projs.length)){this.notify('İlk tapşırıq üçün layihə yaradın.');return this.open('project')}
