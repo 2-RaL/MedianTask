@@ -285,7 +285,7 @@ const app=createApp({
 
     const statuses=[
       {key:'todo',label:'Planlaşdırılıb',count:todo,pct:total?Math.round((todo/total)*100):0,barPct:Math.round((todo/maxStatus)*100),color:'#8f9b91'},
-      {key:'doing',label:'İcradadır',count:doing,pct:total?Math.round((doing/total)*100):0,barPct:Math.round((doing/maxStatus)*100),color:'#ad8652'},
+      {key:'doing',label:'İcradadır',count:doing,pct:total?Math.round((doing/total)*100):0,barPct:Math.round((doing/maxStatus)*100),color:'#1a73e8'},
       {key:'review',label:'Yoxlamada',count:review,pct:total?Math.round((review/total)*100):0,barPct:Math.round((review/maxStatus)*100),color:'#79909e'},
       {key:'done',label:'Tamamlanıb',count:done,pct:total?Math.round((done/total)*100):0,barPct:Math.round((done/maxStatus)*100),color:'#37583f'},
     ];
@@ -1013,8 +1013,8 @@ const app=createApp({
    <Row ss:Height="28">
     <Cell ss:StyleID="CardValue"><Data ss:Type="Number">${total}</Data></Cell>
     <Cell ss:StyleID="CardValueGreen"><Data ss:Type="String">${done} (${doneRate}%)</Data></Cell>
-    <Cell ss:StyleID="CardValueAmber"><Data ss:Type="Number">${doing}</Data></Cell>
-    <Cell ss:StyleID="CardValueBlue"><Data ss:Type="Number">${review}</Data></Cell>
+    <Cell ss:StyleID="CardValueBlue"><Data ss:Type="Number">${doing}</Data></Cell>
+    <Cell ss:StyleID="CardValueAmber"><Data ss:Type="Number">${review}</Data></Cell>
     <Cell ss:StyleID="CardValue"><Data ss:Type="Number">${todo}</Data></Cell>
     <Cell ss:StyleID="${late?'CardValueRed':'CardValue'}"><Data ss:Type="Number">${late}</Data></Cell>
     <Cell ss:StyleID="CardValueGreen"><Data ss:Type="String">${doneRate}%</Data></Cell>
