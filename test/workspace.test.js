@@ -253,7 +253,11 @@ test('Şirkətlər, limitlər, səlahiyyətlər və tapşırıqlar',async t=>{
   assert.ok(indexHtmlContent.includes('detail-tabs-bar'), 'Task detail should have tabs for history and comments');
   assert.ok(!indexHtmlContent.includes('👑'), 'Crown emoji must be removed from task creation');
 
+  assert.ok(indexHtmlContent.includes('class="stars-sky"'), 'Login cover must contain starry night sky');
+  assert.ok(indexHtmlContent.includes('stars-svg'), 'Starry night sky must contain stars SVG');
+
   const styleCssContent = await readFile(fileURLToPath(new URL('../public/style.css', import.meta.url)), 'utf-8');
+  assert.ok(styleCssContent.includes('.stars-sky') && styleCssContent.includes('.stars-svg'), 'Starry night sky styles must be defined');
   assert.ok(styleCssContent.includes('.lane.ltodo h3') && styleCssContent.includes('.lane.ldoing h3') && styleCssContent.includes('.lane.lreview h3') && styleCssContent.includes('.lane.ldone h3'), 'Status column headers have custom backgrounds');
   assert.ok(styleCssContent.includes('.profile-avatar-row'), 'Profile avatar row styling is defined');
 

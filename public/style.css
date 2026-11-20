@@ -11,15 +11,104 @@
 .cover {
   grid-area: 1 / 1;
   isolation: isolate;
+  position: relative;
+  overflow: hidden;
+}
+
+.stars-sky {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+  background: radial-gradient(ellipse at 40% 25%, rgba(27, 74, 62, 0.45) 0%, rgba(11, 32, 26, 0.75) 100%);
+}
+
+.stars-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.stars-svg .tw-1 { animation: starTwinkle1 4.2s ease-in-out infinite alternate; }
+.stars-svg .tw-2 { animation: starTwinkle2 3.6s ease-in-out infinite alternate 0.9s; }
+.stars-svg .tw-3 { animation: starTwinkle3 5.0s ease-in-out infinite alternate 1.7s; }
+.stars-svg .tw-4 { animation: starTwinkle4 4.5s ease-in-out infinite alternate 2.3s; }
+.stars-svg .tw-5 { animation: starTwinkle5 3.3s ease-in-out infinite alternate 1.2s; }
+
+@keyframes starTwinkle1 {
+  0% { opacity: 0.35; }
+  50% { opacity: 0.9; }
+  100% { opacity: 1; }
+}
+@keyframes starTwinkle2 {
+  0% { opacity: 1; }
+  50% { opacity: 0.3; }
+  100% { opacity: 0.85; }
+}
+@keyframes starTwinkle3 {
+  0% { opacity: 0.4; }
+  45% { opacity: 1; }
+  100% { opacity: 0.6; }
+}
+@keyframes starTwinkle4 {
+  0% { opacity: 0.9; }
+  60% { opacity: 0.25; }
+  100% { opacity: 0.95; }
+}
+@keyframes starTwinkle5 {
+  0% { opacity: 0.3; }
+  50% { opacity: 0.8; }
+  100% { opacity: 1; }
+}
+
+.shooting-star {
+  position: absolute;
+  top: 12%;
+  left: 65%;
+  width: 110px;
+  height: 1.5px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0));
+  transform: rotate(-35deg) translate3d(0, 0, 0);
+  opacity: 0;
+  animation: meteorFall1 14s infinite 2s ease-in;
+  pointer-events: none;
+}
+@keyframes meteorFall1 {
+  0%, 88% { opacity: 0; transform: rotate(-35deg) translate3d(0, 0, 0); }
+  90% { opacity: 1; }
+  93% { opacity: 0; transform: rotate(-35deg) translate3d(-260px, 180px, 0); }
+  100% { opacity: 0; }
+}
+
+.shooting-star-2 {
+  position: absolute;
+  top: 45%;
+  left: 82%;
+  width: 80px;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(255, 240, 200, 0.9), rgba(255, 255, 255, 0));
+  transform: rotate(-28deg) translate3d(0, 0, 0);
+  opacity: 0;
+  animation: meteorFall2 19s infinite 9s ease-in;
+  pointer-events: none;
+}
+@keyframes meteorFall2 {
+  0%, 89% { opacity: 0; transform: rotate(-28deg) translate3d(0, 0, 0); }
+  91% { opacity: 0.9; }
+  94% { opacity: 0; transform: rotate(-28deg) translate3d(-200px, 130px, 0); }
+  100% { opacity: 0; }
 }
 
 .sculpture {
   position: absolute;
   inset: 22% -15% 12% 17%;
-  z-index: -1;
+  z-index: 1;
   pointer-events: none;
   transform: rotate(-17deg);
-  opacity: .85;
+  opacity: .75;
 }
 
 .sculpture i {
@@ -33,8 +122,15 @@
 }
 
 .login-brand {
+  position: relative;
+  z-index: 2;
   align-self: flex-start;
   width: min(100%, clamp(200px, 26vw, 340px));
+}
+
+.covertext {
+  position: relative;
+  z-index: 2;
 }
 
 .loginform {
