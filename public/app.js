@@ -1,5 +1,5 @@
 const { createApp } = Vue;
-const icons={grid:'M3 3h7v7H3z M14 3h7v7h-7z M3 14h7v7H3z M14 14h7v7h-7z',board:'M3 4h18v16H3z M9 4v16 M15 4v16',list:'M7 6h14 M7 12h14 M7 18h14 M3 6h.1 M3 12h.1 M3 18h.1',box:'m12 2 9 5v10l-9 5-9-5V7z M3 7l9 5 9-5 M12 12v10',team:'M3 20v-2a5 5 0 0 1 10 0v2 M16 14a5 5 0 0 1 5 5 M12 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0 M16 4a4 4 0 0 1 0 8',report:'M3 3v18h18 M8 16v-5 M13 16V6 M18 16v-8',check:'m4 12 5 5L20 6',clock:'M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0 M12 6v6l4 2',search:'M17 10a7 7 0 1 1-14 0 7 7 0 0 1 14 0 M15 15l6 6',date:'M3 5h18v16H3z M7 2v6 M17 2v6 M3 10h18',plus:'M12 5v14 M5 12h14',logout:'M10 3H4v18h6 M9 12h12 M17 8l4 4-4 4',menu:'M3 5h18 M3 12h18 M3 19h18',flag:'M5 21V3c5-4 9 5 15 0v10c-6 5-10-4-15 0',company:'M4 21V3h12v18 M16 10h4v11 M2 21h20 M8 7h4 M8 11h4 M8 15h4'};
+const icons={grid:'M3 3h7v7H3z M14 3h7v7h-7z M3 14h7v7H3z M14 14h7v7h-7z',board:'M3 4h18v16H3z M9 4v16 M15 4v16',list:'M7 6h14 M7 12h14 M7 18h14 M3 6h.1 M3 12h.1 M3 18h.1',box:'m12 2 9 5v10l-9 5-9-5V7z M3 7l9 5 9-5 M12 12v10',team:'M3 20v-2a5 5 0 0 1 10 0v2 M16 14a5 5 0 0 1 5 5 M12 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0 M16 4a4 4 0 0 1 0 8',report:'M3 3v18h18 M8 16v-5 M13 16V6 M18 16v-8',check:'m4 12 5 5L20 6',clock:'M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0 M12 6v6l4 2',search:'M17 10a7 7 0 1 1-14 0 7 7 0 0 1 14 0 M15 15l6 6',date:'M3 5h18v16H3z M7 2v6 M17 2v6 M3 10h18',plus:'M12 5v14 M5 12h14',logout:'M10 3H4v18h6 M9 12h12 M17 8l4 4-4 4',menu:'M3 5h18 M3 12h18 M3 19h18',flag:'M5 21V3c5-4 9 5 15 0v10c-6 5-10-4-15 0',company:'M4 21V3h12v18 M16 10h4v11 M2 21h20 M8 7h4 M8 11h4 M8 15h4',folder:'M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z',user:'M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2 M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8z',share:'M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8 M16 6l-4-4-4 4 M12 2v13'};
 const autoFillUsers = [
   {id:'platform',label:'Super admin',email:'r.tural.94@gmail.com',password:'Admin123456789*'},
   {id:'admin',label:'Şirkət admini',email:'info@atm.gov.az',password:'ATM123456789*'},
@@ -22,7 +22,10 @@ const app=createApp({
   calMonth:new Date().getMonth(),
   selectedDate:new Date().toISOString().slice(0,10),
   newDateNote:{title:'',content:''},
-  newFreeNote:{title:'',content:''}
+  newFreeNote:{title:'',content:''},
+  teamTab:'members',
+  taskTarget:'users',
+  delegateOwners:[]
  }),
  computed:{
   isPlatform(){return this.s?.me.role==='platform'},admin(){return this.s?.me.role==='admin'},
@@ -235,10 +238,27 @@ const app=createApp({
   current(){return this.s?.tasks?.find(t=>t.id===this.form.id)},
   actionLabel(){if(this.page==='reports')return 'Excel yüklə';if(this.page==='notes'||(!this.admin&&!this.isPlatform))return '';return {board:'Yeni tapşırıq',mine:'Yeni tapşırıq',team:'İstifadəçi əlavə et',companies:'Şirkət əlavə et',plans:'Yeni paket'}[this.page]},
   modalTitle(){
+    if(this.modal==='profile')return 'Profil məlumatları';
+    if(this.modal==='group')return this.form.id?'Şöbəni redaktə et':'Yeni şöbə / qrup yarat';
+    if(this.modal==='deleteGroup')return 'Şöbə silinsin?';
     if(this.modal==='importUsers')return 'Excel ilə toplu əlavə et';
     if(this.modal==='deleteUser')return 'İstifadəçi silinsin?';
     if(this.modal==='deleteTask')return 'Tapşırıq silinsin?';
     return this.modal==='detail'?this.current?.title:({task:'Tapşırıq',plan:'Paket',company:'Şirkət',user:'İstifadəçi',project:'Layihə'}[this.modal]||'')+(this.form.id?' · redaktə':' · əlavə et');
+  },
+  selectedGroupObj(){
+    return this.s?.groups?.find(g=>g.id===Number(this.form.group));
+  },
+  currentGroup(){
+    return this.s?.groups?.find(g=>g.id===this.current?.group_id);
+  },
+  isCurrentGroupLead(){
+    return this.admin || (this.currentGroup && this.currentGroup.lead===this.s?.me?.id);
+  },
+  currentGroupMembers(){
+    if(!this.currentGroup)return [];
+    const memberIds=this.currentGroup.member_ids||[];
+    return (this.s?.users||[]).filter(u=>u.active&&memberIds.includes(u.id));
   }
  },
  async mounted(){
@@ -275,7 +295,27 @@ const app=createApp({
   open(type,data={}){
     this.mobile=false;this.error='';this.note='';this.modal=type;
     const initialCompany=(data.company!==undefined&&data.company!==null)?data.company:(this.companyFilter&&this.companyFilter!=='platform'?Number(this.companyFilter):(this.s.companies?.[0]?.id||''));
-    if(type==='task'){
+    if(type==='profile'){
+      this.form={
+        name:this.s.me.name,
+        email:this.s.me.email,
+        password:''
+      };
+    }else if(type==='group'){
+      const activeFirst=this.activeUsers[0]?.id||'';
+      this.form={
+        id:data.id||null,
+        name:data.name||'',
+        lead:data.lead||activeFirst,
+        members:data.member_ids?[...data.member_ids]:(activeFirst?[activeFirst]:[])
+      };
+    }else if(type==='deleteGroup'){
+      this.form={...data};
+    }else if(type==='detail'){
+      this.form={...data};
+      this.delegateOwners=data.owner?[data.owner]:[];
+    }else if(type==='task'){
+      this.taskTarget=data.group_id?'group':'users';
       if(data.id){
         this.form={
           id:data.id,
@@ -283,6 +323,7 @@ const app=createApp({
           title:data.title,
           details:data.details||'',
           project:data.project,
+          group:data.group_id||'',
           owner:data.owner||'',
           owners:data.owner?[data.owner]:[],
           status:data.status,
@@ -292,10 +333,12 @@ const app=createApp({
       }else{
         const activeIds=this.activeUsers.map(u=>u.id);
         const defaultOwner=this.page==='mine'?this.s.me.id:(activeIds.length?activeIds[0]:this.s.me.id);
+        const defaultGroup=this.s.groups?.[0]?.id||'';
         this.form={
           title:'',
           details:'',
           project:this.project||this.s.projects?.[0]?.id||'',
+          group:defaultGroup,
           owner:defaultOwner,
           owners:defaultOwner?[defaultOwner]:[],
           status:data.status||'todo',
@@ -322,16 +365,58 @@ const app=createApp({
   close(){this.$refs.dialog?.close();this.modal='';this.error=''},detail(t){this.open('detail',t)},
   async mutate(type,payload,after){if(this.busy)return;this.busy=true;this.error='';try{await this.api(type,payload);this.s=await this.api('state');after?.();this.notify('Dəyişiklik yadda saxlanıldı.')}catch(e){this.error=e.message;if(!this.modal)this.notify(e.message);if(e.status===409){try{this.s=await this.api('state')}catch{}}}finally{this.busy=false}},
   save(){
+    if(this.modal==='profile'){
+      if(!this.form.name?.trim()){this.error='Ad və soyad daxil edin.';return;}
+      if(!this.form.email?.trim()){this.error='E-poçt daxil edin.';return;}
+      if(this.form.password&&this.form.password.length<12){this.error='Şifrə ən azı 12 simvol olmalıdır.';return;}
+      this.mutate('profile',this.form,()=>{this.close();this.notify('Profil məlumatlarınız yeniləndi.');});
+      return;
+    }
+    if(this.modal==='group'){
+      if(!this.form.name?.trim()){this.error='Şöbənin adını daxil edin.';return;}
+      if(!this.form.lead){this.error='Şöbə rəhbərini seçin.';return;}
+      this.mutate('group',this.form,()=>this.close());
+      return;
+    }
+    if(this.modal==='deleteGroup'){
+      this.mutate('deleteGroup',{id:this.form.id},()=>this.close());
+      return;
+    }
     if(this.modal==='task'){
       if(!this.form.title?.trim()){this.error='Tapşırığın adını daxil edin.';return;}
       if(!this.form.project){this.error='Layihə seçin.';return;}
-      if(this.form.id){
+      if(this.taskTarget==='group'&&!this.form.id){
+        if(!this.form.group){this.error='Şöbə seçin.';return;}
+      }else if(this.form.id){
         if(!this.form.owner){this.error='Məsul şəxs seçilməlidir.';return;}
       }else{
         if(!this.form.owners||!this.form.owners.length){this.error='Ən azı bir məsul şəxs seçilməlidir.';return;}
       }
+      const payload={
+        ...this.form,
+        group:(this.taskTarget==='group'||this.form.id)?this.form.group:null
+      };
+      this.mutate('task',payload,()=>this.close());
+      return;
     }
     this.mutate(this.modal,this.form,()=>this.close());
+  },
+  async delegateCurrentTask(){
+    if(!this.current)return;
+    if(!this.delegateOwners||!this.delegateOwners.length){
+      this.notify('Ən azı bir əməkdaş seçin.');
+      return;
+    }
+    await this.mutate('delegateTask',{
+      id:this.current.id,
+      owners:this.delegateOwners
+    },()=>{
+      this.close();
+      this.notify('Tapşırıq şöbə əməkdaşına təhkim edildi.');
+    });
+  },
+  groupName(id){
+    return this.s?.groups?.find(g=>g.id===id)?.name||'';
   },comment(){this.mutate('comment',{id:this.form.id,body:this.note},()=>this.note='')},
   async importUsers(){
     if(this.busy)return;

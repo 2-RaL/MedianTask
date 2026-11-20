@@ -25,10 +25,13 @@ CREATE TABLE IF NOT EXISTS plans(id INTEGER PRIMARY KEY,name TEXT NOT NULL UNIQU
 CREATE TABLE IF NOT EXISTS companies(id INTEGER PRIMARY KEY,name TEXT NOT NULL,plan INTEGER NOT NULL REFERENCES plans,cap INTEGER);
 CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY,name TEXT NOT NULL,email TEXT UNIQUE NOT NULL,hash TEXT NOT NULL,role TEXT NOT NULL,company INTEGER REFERENCES companies,active INTEGER NOT NULL DEFAULT 1);
 CREATE TABLE IF NOT EXISTS projects(id INTEGER PRIMARY KEY,name TEXT NOT NULL,company INTEGER NOT NULL REFERENCES companies);
-CREATE TABLE IF NOT EXISTS tasks(id INTEGER PRIMARY KEY,title TEXT NOT NULL,details TEXT NOT NULL,project INTEGER NOT NULL REFERENCES projects,owner INTEGER REFERENCES users,status TEXT NOT NULL,priority TEXT NOT NULL,due TEXT NOT NULL,version INTEGER DEFAULT 1);
+CREATE TABLE IF NOT EXISTS tasks(id INTEGER PRIMARY KEY,title TEXT NOT NULL,details TEXT NOT NULL,project INTEGER NOT NULL REFERENCES projects,owner INTEGER REFERENCES users,status TEXT NOT NULL,priority TEXT NOT NULL,due TEXT NOT NULL,group_id INTEGER,version INTEGER DEFAULT 1);
 CREATE TABLE IF NOT EXISTS comments(id INTEGER PRIMARY KEY,task INTEGER REFERENCES tasks ON DELETE CASCADE,author INTEGER REFERENCES users,body TEXT NOT NULL,created TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
 CREATE TABLE IF NOT EXISTS notes(id INTEGER PRIMARY KEY,user INTEGER NOT NULL REFERENCES users ON DELETE CASCADE,title TEXT NOT NULL DEFAULT '',content TEXT NOT NULL,date TEXT,created TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
+CREATE TABLE IF NOT EXISTS groups(id INTEGER PRIMARY KEY,company INTEGER NOT NULL REFERENCES companies ON DELETE CASCADE,name TEXT NOT NULL,lead INTEGER REFERENCES users ON DELETE SET NULL,created TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
+CREATE TABLE IF NOT EXISTS group_members(group_id INTEGER NOT NULL REFERENCES groups ON DELETE CASCADE,user_id INTEGER NOT NULL REFERENCES users ON DELETE CASCADE,PRIMARY KEY(group_id, user_id));
 CREATE TABLE IF NOT EXISTS sessions(token TEXT PRIMARY KEY,user INTEGER REFERENCES users,expires INTEGER NOT NULL);`);
+try{db.exec('ALTER TABLE tasks ADD COLUMN group_id INTEGER REFERENCES groups(id) ON DELETE SET NULL;');}catch{}
 const one=(sql,...p)=>db.prepare(sql).get(...p);
 const all=(sql,...p)=>db.prepare(sql).all(...p);
 const run=(sql,...p)=>db.prepare(sql).run(...p);
@@ -85,7 +88,10 @@ if(!one('SELECT id FROM users LIMIT 1'))tx(()=>{
   const aAtm=user('Şirkət Admini','info@atm.gov.az','ATM123456789*','admin',cAtm);
   const uAtm=user('Tural Rüstəmov','tural.rustamov@atm.gov.az','ATM123456789*','member',cAtm);
   const pAtm=insert('INSERT INTO projects(name,company) VALUES(?,?)','ATM Layihəsi',cAtm);
-  insert('INSERT INTO tasks(title,details,project,owner,status,priority,due) VALUES(?,?,?,?,?,?,?)','İlkin tapşırıq','Sistemə xoş gəlmisiniz.',pAtm,uAtm,'doing','high',new Date().toISOString().slice(0,10));
+  const gAtm=insert('INSERT INTO groups(company,name,lead) VALUES(?,?,?)',cAtm,'İnformasiya Texnologiyaları Şöbəsi',uAtm);
+  insert('INSERT INTO group_members(group_id,user_id) VALUES(?,?)',gAtm,uAtm);
+  insert('INSERT INTO group_members(group_id,user_id) VALUES(?,?)',gAtm,aAtm);
+  insert('INSERT INTO tasks(title,details,project,owner,status,priority,due,group_id) VALUES(?,?,?,?,?,?,?,?)','İlkin tapşırıq','Sistemə xoş gəlmisiniz.',pAtm,uAtm,'doing','high',new Date().toISOString().slice(0,10),gAtm);
   const p=['Brend strategiyası','Rəqəmsal məhsul','Əməliyyat planı'].map(n=>insert('INSERT INTO projects(name,company) VALUES(?,?)',n,c));
   ['Brend kitabçasının hazırlanması','Müştəri müsahibələrinin planı','Ana səhifənin dizaynı','Komanda büdcəsinin təsdiqi','Mobil prototipin sınağı','Tərəfdaş təqdimatının icmalı','İstifadəçi axınlarının xəritəsi','Rüblük hədəflərin təhlili','Vizual üslubun təsdiqi'].forEach((t,i)=>{
     const date=new Date();date.setUTCDate(date.getUTCDate()+i-2);
@@ -99,9 +105,14 @@ function task(id,c){return one('SELECT t.* FROM tasks t JOIN projects p ON t.pro
 function staff(u){if(u.role!=='admin')fail('Şirkət administratorunun icazəsi tələb olunur.',403);}
 function platform(u){if(u.role!=='platform')fail('Platforma administratorunun icazəsi tələb olunur.',403);}
 function state(u){
-  if(u.role==='platform')return {me:u,plans:all('SELECT * FROM plans ORDER BY id'),companies:all(companySQL+' ORDER BY c.id'),users:all('SELECT '+publicUser+' FROM users ORDER BY id'),notes:all('SELECT * FROM notes WHERE user=? ORDER BY id DESC',u.id)};
+  if(u.role==='platform')return {me:u,plans:all('SELECT * FROM plans ORDER BY id'),companies:all(companySQL+' ORDER BY c.id'),users:all('SELECT '+publicUser+' FROM users ORDER BY id'),notes:all('SELECT * FROM notes WHERE user=? ORDER BY id DESC',u.id),groups:[]};
   const c=u.company;
-  return {me:u,company:company(c),users:all('SELECT '+publicUser+' FROM users WHERE company=?',c),projects:all('SELECT * FROM projects WHERE company=?',c),tasks:all('SELECT t.* FROM tasks t JOIN projects p ON p.id=t.project WHERE p.company=? ORDER BY t.id',c),comments:all('SELECT m.* FROM comments m JOIN tasks t ON t.id=m.task JOIN projects p ON p.id=t.project WHERE p.company=? ORDER BY m.id',c),notes:all('SELECT * FROM notes WHERE user=? ORDER BY id DESC',u.id)};
+  const groups=all(`SELECT g.*, u.name AS lead_name, (SELECT json_group_array(user_id) FROM group_members WHERE group_id=g.id) AS member_ids FROM groups g LEFT JOIN users u ON u.id=g.lead WHERE g.company=? ORDER BY g.id`, c).map(g=>({
+    ...g,
+    member_ids:JSON.parse(g.member_ids||'[]')
+  }));
+  const tasks=all('SELECT t.*, g.name AS group_name FROM tasks t JOIN projects p ON p.id=t.project LEFT JOIN groups g ON g.id=t.group_id WHERE p.company=? ORDER BY t.id', c);
+  return {me:u,company:company(c),users:all('SELECT '+publicUser+' FROM users WHERE company=?',c),groups,projects:all('SELECT * FROM projects WHERE company=?',c),tasks,comments:all('SELECT m.* FROM comments m JOIN tasks t ON t.id=m.task JOIN projects p ON p.id=t.project WHERE p.company=? ORDER BY m.id',c),notes:all('SELECT * FROM notes WHERE user=? ORDER BY id DESC',u.id)};
 }
 function change(action,b,u){
   switch(action){
@@ -159,14 +170,79 @@ function change(action,b,u){
       if(target.role==='platform'&&!one("SELECT id FROM users WHERE role='platform' AND id<>?",target.id))fail('Sistemdə ən azı bir super administrator qalmalıdır.');
       run('UPDATE tasks SET owner=NULL WHERE owner=?',target.id);
       run('UPDATE comments SET author=NULL WHERE author=?',target.id);
+      run('UPDATE groups SET lead=NULL WHERE lead=?',target.id);
+      run('DELETE FROM group_members WHERE user_id=?',target.id);
       run('DELETE FROM notes WHERE user=?',target.id);
       run('DELETE FROM sessions WHERE user=?',target.id);
       run('DELETE FROM users WHERE id=?',target.id);
       break;
     }
+    case 'profile':{
+      const newName=str(b.name,120);
+      const newEmail=email(b.email);
+      if(one('SELECT id FROM users WHERE email=? AND id<>?',newEmail,u.id)){
+        fail('Bu e-poçt ünvanı artıq istifadə olunur.',409);
+      }
+      run('UPDATE users SET name=?, email=? WHERE id=?',newName,newEmail,u.id);
+      if(b.password){
+        run('UPDATE users SET hash=? WHERE id=?',hash(b.password),u.id);
+      }
+      u.name=newName;
+      u.email=newEmail;
+      break;
+    }
+    case 'group':{
+      staff(u);
+      const name=str(b.name,120);
+      let lead=b.lead?Number(b.lead):null;
+      if(lead&&!one('SELECT id FROM users WHERE id=? AND company=? AND active=1',lead,u.company)){
+        fail('Aktiv şöbə rəhbəri seçin.');
+      }
+      let members=Array.isArray(b.members)?[...new Set(b.members.map(Number))]:[];
+      for(const mId of members){
+        if(!one('SELECT id FROM users WHERE id=? AND company=? AND active=1',mId,u.company)){
+          fail('Şöbə üzvləri aktiv əməkdaşlar olmalıdır.');
+        }
+      }
+      if(lead&&!members.includes(lead)){
+        members.push(lead);
+      }
+
+      let groupId=b.id?Number(b.id):null;
+      if(groupId){
+        const existing=one('SELECT id FROM groups WHERE id=? AND company=?',groupId,u.company);
+        if(!existing)fail('Şöbə tapılmadı.',404);
+        run('UPDATE groups SET name=?, lead=? WHERE id=?',name,lead,groupId);
+        run('DELETE FROM group_members WHERE group_id=?',groupId);
+      }else{
+        groupId=insert('INSERT INTO groups(company, name, lead) VALUES(?,?,?)',u.company,name,lead);
+      }
+
+      for(const mId of members){
+        run('INSERT OR IGNORE INTO group_members(group_id, user_id) VALUES(?,?)',groupId,mId);
+      }
+      break;
+    }
+    case 'deleteGroup':{
+      staff(u);
+      const target=one('SELECT id FROM groups WHERE id=? AND company=?',Number(b.id),u.company);
+      if(!target)fail('Şöbə tapılmadı.',404);
+      run('UPDATE tasks SET group_id=NULL WHERE group_id=?',target.id);
+      run('DELETE FROM group_members WHERE group_id=?',target.id);
+      run('DELETE FROM groups WHERE id=?',target.id);
+      break;
+    }
     case 'project':staff(u);insert('INSERT INTO projects(name,company) VALUES(?,?)',str(b.name),u.company);break;
     case 'task':{
-      staff(u);
+      const isEditing=!!b.id;
+      let t=null;
+      if(isEditing){
+        t=task(b.id,u.company);
+        const isLead=t.group_id&&one('SELECT 1 FROM groups WHERE id=? AND lead=?',t.group_id,u.id);
+        if(u.role!=='admin'&&!isLead)fail('Şirkət administratorunun və ya qrup rəhbərinin icazəsi tələb olunur.',403);
+      }else{
+        staff(u);
+      }
       if(!one('SELECT id FROM projects WHERE id=? AND company=?',Number(b.project),u.company))fail('Layihə seçin.');
       const due=b.due||'';if(due&&(!/^\d{4}-\d{2}-\d{2}$/.test(due)||isNaN(Date.parse(due))||new Date(due).toISOString().slice(0,10)!==due))fail('Tarixi yoxlayın.');
       const status=choose(b.status,statuses);
@@ -174,26 +250,77 @@ function change(action,b,u){
       const title=str(b.title,200);
       const details=b.details?str(b.details,5000):'';
       const project=Number(b.project);
-      if(b.id){
-        task(b.id,u.company);
+      
+      let groupId=b.group?Number(b.group):null;
+      if(groupId&&!isEditing){
+        const grp=one('SELECT * FROM groups WHERE id=? AND company=?',groupId,u.company);
+        if(!grp)fail('Şöbə tapılmadı.');
+        if(!grp.lead||!one('SELECT id FROM users WHERE id=? AND company=? AND active=1',grp.lead,u.company)){
+          fail('Seçilən şöbə üçün aktiv rəhbər təyin edilməyib.');
+        }
+      }
+
+      if(isEditing){
         const owner=b.owner?Number(b.owner):(Array.isArray(b.owners)&&b.owners[0]?Number(b.owners[0]):null);
         if(!owner||!one('SELECT id FROM users WHERE id=? AND company=? AND active=1',owner,u.company))fail('Aktiv məsul şəxs seçin.');
-        if(!run('UPDATE tasks SET title=?,details=?,project=?,owner=?,status=?,priority=?,due=?,version=version+1 WHERE id=? AND version=?',title,details,project,owner,status,priority,due,b.id,b.version).changes)fail('Tapşırıq dəyişib. Yeniləyib təkrar açın.',409);
+        if(u.role!=='admin'&&t.group_id){
+          if(!one('SELECT 1 FROM group_members WHERE group_id=? AND user_id=?',t.group_id,owner))fail('Seçilən əməkdaş bu şöbənin üzvü olmalıdır.');
+        }
+        const finalGroupId=(b.group!==undefined)?(b.group?Number(b.group):null):t.group_id;
+        if(!run('UPDATE tasks SET title=?,details=?,project=?,owner=?,status=?,priority=?,due=?,group_id=?,version=version+1 WHERE id=? AND version=?',title,details,project,owner,status,priority,due,finalGroupId,b.id,b.version).changes)fail('Tapşırıq dəyişib. Yeniləyib təkrar açın.',409);
       }else{
         let owners=[];
-        if(Array.isArray(b.owners)){
+        if(groupId){
+          const grp=one('SELECT lead FROM groups WHERE id=?',groupId);
+          owners=[grp.lead];
+        }else if(Array.isArray(b.owners)){
           owners=b.owners.map(Number).filter(id=>Number.isSafeInteger(id)&&id>0);
         }else if(b.owner){
           owners=[Number(b.owner)];
         }
         owners=[...new Set(owners)];
-        if(!owners.length)fail('Tapşırıq üçün ən azı bir məsul şəxs seçilməlidir.');
+        if(!owners.length)fail('Tapşırıq üçün ən azı bir məsul şəxs və ya şöbə seçilməlidir.');
         for(const o of owners){
           if(!one('SELECT id FROM users WHERE id=? AND company=? AND active=1',o,u.company))fail('Seçilən əməkdaş aktiv olmalıdır.');
         }
         for(const o of owners){
-          insert('INSERT INTO tasks(title,details,project,owner,status,priority,due) VALUES(?,?,?,?,?,?,?)',title,details,project,o,status,priority,due);
+          insert('INSERT INTO tasks(title,details,project,owner,status,priority,due,group_id) VALUES(?,?,?,?,?,?,?,?)',title,details,project,o,status,priority,due,groupId);
         }
+      }
+      break;
+    }
+    case 'delegateTask':{
+      if(!u.company)fail('Şirkət hesabı tələb olunur.',403);
+      const t=task(b.id,u.company);
+      const isLead=t.group_id&&one('SELECT 1 FROM groups WHERE id=? AND lead=?',t.group_id,u.id);
+      if(u.role!=='admin'&&!isLead)fail('Yalnız şirkət administratoru və ya qrup rəhbəri tapşırığı təhkim edə bilər.',403);
+      
+      let owners=[];
+      if(Array.isArray(b.owners)){
+        owners=b.owners.map(Number).filter(id=>Number.isSafeInteger(id)&&id>0);
+      }else if(b.owner){
+        owners=[Number(b.owner)];
+      }
+      owners=[...new Set(owners)];
+      if(!owners.length)fail('Ən azı bir məsul şəxs seçilməlidir.');
+
+      if(u.role!=='admin'&&t.group_id){
+        for(const oId of owners){
+          if(!one('SELECT 1 FROM group_members WHERE group_id=? AND user_id=?',t.group_id,oId)){
+            fail('Seçilən əməkdaş bu şöbənin üzvü olmalıdır.');
+          }
+        }
+      }else{
+        for(const oId of owners){
+          if(!one('SELECT 1 FROM users WHERE id=? AND company=? AND active=1',oId,u.company)){
+            fail('Seçilən əməkdaş aktiv olmalıdır.');
+          }
+        }
+      }
+
+      run('UPDATE tasks SET owner=?, version=version+1 WHERE id=?',owners[0],t.id);
+      for(let i=1;i<owners.length;i++){
+        insert('INSERT INTO tasks(title,details,project,owner,status,priority,due,group_id) VALUES(?,?,?,?,?,?,?,?)',t.title,t.details,t.project,owners[i],t.status,t.priority,t.due,t.group_id);
       }
       break;
     }

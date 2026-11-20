@@ -50,6 +50,29 @@ test('Şirkətlər, limitlər, səlahiyyətlər və tapşırıqlar',async t=>{
   assert.equal(notesAfter.find(n=>n.title==='Sərbəst qeyd').date,null);
   await post('deleteNote',a,{id:notesAfter[0].id});
   assert.equal((await state(a)).notes.length,1);
+  await post('profile',a,{name:'Alpha Boss',email:'alpha-new@test.local',password:'NewPassword2026*'});
+  const aState=await state(a);
+  assert.equal(aState.me.name,'Alpha Boss');
+  assert.equal(aState.me.email,'alpha-new@test.local');
+  const aLogin=await req('login','',{email:'alpha-new@test.local',password:'NewPassword2026*'});
+  assert.equal(aLogin.status,200);
+  await post('profile',a,{name:'Alpha Original',email:'alpha@test.local',password});
+  const thirdUser=(await state(a)).users.find(u=>u.email==='third@test.local');
+  await post('group',a,{name:'Maliyyə Şöbəsi',lead:thirdUser.id,members:[thirdUser.id]});
+  let sGroups=(await state(a)).groups;
+  assert.equal(sGroups.length,1);
+  assert.equal(sGroups[0].name,'Maliyyə Şöbəsi');
+  assert.equal(sGroups[0].lead,thirdUser.id);
+  await post('task',a,{title:'Büdcə təhlili',details:'Şöbəyə tapşırıq',project:1,status:'todo',priority:'high',due:'2026-12-10',group:sGroups[0].id});
+  let grpTask=(await state(a)).tasks.find(t=>t.title==='Büdcə təhlili');
+  assert.ok(grpTask);
+  assert.equal(grpTask.owner,thirdUser.id);
+  assert.equal(grpTask.group_id,sGroups[0].id);
+  const thirdSign=await sign('third@test.local');
+  await post('group',a,{id:sGroups[0].id,name:'Maliyyə Şöbəsi',lead:thirdUser.id,members:[thirdUser.id,(await state(a)).me.id]});
+  await post('delegateTask',thirdSign,{id:grpTask.id,owners:[(await state(a)).me.id]});
+  grpTask=(await state(a)).tasks.find(t=>t.id===grpTask.id);
+  assert.equal(grpTask.owner,(await state(a)).me.id);
   const importRows=[
     {line:2,name:'Excel Member',email:'excel-member@test.local',password},
     {line:4,name:'Excel Admin',email:'excel-admin@test.local',password,role:'admin'},

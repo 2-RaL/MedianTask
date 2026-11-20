@@ -1054,3 +1054,281 @@ button.danger:hover {
   font-size: 11px;
   color: var(--muted);
 }
+
+/* Clickable Sidebar Profile */
+.sidefoot-profile {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: transparent;
+  border: 0;
+  padding: 4px;
+  color: inherit;
+  text-align: left;
+  flex: 1;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background .18s;
+}
+.sidefoot-profile:hover {
+  background: #ffffff14;
+}
+.sidefoot-profile .avatar {
+  flex-shrink: 0;
+}
+.sidefoot-profile strong {
+  display: block;
+  font-size: 12px;
+  color: white;
+}
+.sidefoot-profile small {
+  display: block;
+  font-size: 10px;
+  color: #b7c9bd;
+  margin-top: 2px;
+}
+
+/* Team Tab Switch */
+.team-tab-switch {
+  display: flex;
+  gap: 4px;
+  background: #eeeee7;
+  padding: 3px;
+  border-radius: 6px;
+}
+.team-tab-switch button {
+  border: 0;
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 7px 12px;
+  border-radius: 5px;
+  color: var(--muted);
+}
+.team-tab-switch button.selected {
+  background: white;
+  color: var(--ink);
+  box-shadow: 0 1px 3px #00000015;
+}
+.teamhead-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.badge-dept {
+  display: inline-block;
+  padding: 2px 7px;
+  background: #f1f4ee;
+  border: 1px solid #d5decb;
+  color: #2b563b;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* Groups / Departments View */
+.groups-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 18px;
+  margin-top: 14px;
+}
+.group-card {
+  background: #fffefa;
+  border: 1px solid var(--line);
+  border-top: 3px solid var(--green);
+  border-radius: 8px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  box-shadow: 0 2px 5px #00000006;
+}
+.group-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+.group-card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.group-card-title .ico {
+  color: var(--green);
+  width: 19px;
+  height: 19px;
+}
+.group-card-title h3 {
+  font-size: 16px;
+  color: var(--ink);
+}
+.group-card-actions button {
+  font-size: 11px;
+  padding: 5px 8px;
+}
+.group-card-lead {
+  background: #f7f9f6;
+  border: 1px solid #e1e7de;
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+.group-card-lead small, .group-card-members small {
+  font-size: 9px;
+  letter-spacing: 1.2px;
+  font-weight: 700;
+  color: var(--muted);
+  display: block;
+  margin-bottom: 6px;
+}
+.lead-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.lead-info strong {
+  display: block;
+  font-size: 13px;
+  color: var(--ink);
+}
+.lead-info small {
+  display: block;
+  font-size: 11px;
+  color: var(--muted);
+  margin: 0;
+  letter-spacing: normal;
+  font-weight: normal;
+}
+.members-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.member-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #f1f3ed;
+  border: 1px solid #d9dfd4;
+  padding: 3px 8px;
+  border-radius: 14px;
+  font-size: 11px;
+  color: var(--ink);
+}
+.member-chip .avatar {
+  min-width: 18px;
+  height: 18px;
+  font-size: 8px;
+}
+.member-chip.islead {
+  background: #e4eee5;
+  border-color: #bad3be;
+  font-weight: 600;
+}
+.member-chip em {
+  font-style: normal;
+  color: #2b563b;
+  font-size: 10px;
+}
+
+/* Task Target Switch */
+.task-target-switch {
+  display: flex;
+  gap: 6px;
+  background: #eeeee7;
+  padding: 4px;
+  border-radius: 6px;
+  margin-bottom: 16px;
+}
+.task-target-switch button {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 8px 12px;
+  border-radius: 5px;
+  color: var(--muted);
+}
+.task-target-switch button.selected {
+  background: white;
+  color: var(--green);
+  box-shadow: 0 1px 4px #00000015;
+}
+.group-task-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: #f0f7f2;
+  border: 1px solid #bedbc4;
+  padding: 10px 14px;
+  border-radius: 6px;
+  margin-bottom: 14px;
+  font-size: 12px;
+  color: #1a422d;
+}
+.group-task-hint .ico {
+  color: #23653f;
+  margin-top: 2px;
+}
+.group-task-hint strong {
+  display: block;
+  font-size: 12px;
+  margin-bottom: 2px;
+}
+.group-task-hint small {
+  color: #3b5f4c;
+  font-size: 11px;
+}
+
+/* Task Details & Delegation Box */
+.task-dept-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #eef5f0;
+  border: 1px solid #bad3be;
+  color: #17422f;
+  padding: 4px 10px;
+  border-radius: 5px;
+  font-size: 11px;
+  margin-bottom: 10px;
+}
+.delegate-box {
+  background: #fbfbf8;
+  border: 1px solid #e1e4d8;
+  border-left: 3px solid var(--green);
+  border-radius: 6px;
+  padding: 14px;
+  margin: 14px 0;
+}
+.delegate-box-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.delegate-box-head .ico {
+  color: var(--green);
+  width: 17px;
+  height: 17px;
+  margin-top: 2px;
+}
+.delegate-box-head strong {
+  display: block;
+  font-size: 13px;
+  color: var(--ink);
+}
+.delegate-box-head small {
+  display: block;
+  font-size: 11px;
+  color: var(--muted);
+}
