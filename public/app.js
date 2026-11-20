@@ -340,7 +340,7 @@ const app=createApp({
   },
   platformMetrics(){return [['Qurumlar',this.s.companies.length,'company'],['Aktiv hesablar',this.s.users.filter(u=>u.active).length,'team'],['Paketlər',this.s.plans.length,'box'],['Boş yerlər',this.s.companies.reduce((n,c)=>n+c.seats-c.used,0),'grid']]},
   current(){return this.s?.tasks?.find(t=>t.id===this.form.id)},
-  actionLabel(){if(this.page==='reports')return 'Excel yüklə';if(this.page==='notes')return '';return (this.admin||this.isPlatform)?{board:'Yeni tapşırıq',mine:'Yeni tapşırıq',projects:'Yeni layihə',team:'İstifadəçi əlavə et',companies:'Qurum əlavə et',plans:'Yeni paket'}[this.page]||'':'';},
+  actionLabel(){if(this.page==='reports')return 'Excel yüklə';if(this.page==='notes')return '';if(['board','mine'].includes(this.page))return 'Yeni tapşırıq';return (this.admin||this.isPlatform)?{projects:'Yeni layihə',team:'İstifadəçi əlavə et',companies:'Qurum əlavə et',plans:'Yeni paket'}[this.page]||'':'';},
   modalTitle(){
     if(this.modal==='shareNote')return 'Qeydi paylaş';
     if(this.modal==='profile')return 'Profil məlumatları';
@@ -475,7 +475,10 @@ const app=createApp({
   primaryAction(){if(this.page==='reports')return this.excel();if(['board','mine'].includes(this.page))return this.newTask('todo');this.open({plans:'plan',companies:'company',team:'user',projects:'project'}[this.page])},
   newTask(status){
     const projs=this.availableProjects;
-    if(!this.isPlatform&&(!projs||!projs.length)){this.notify('İlk tapşırıq üçün layihə yaradın.');return this.open('project')}
+    if(!this.isPlatform&&(!projs||!projs.length)){
+      this.notify(this.admin?'İlk tapşırıq üçün layihə yaradın.':'Hələ heç bir layihə yaradılmayıb.');
+      return this.admin?this.open('project'):null;
+    }
     this.open('task',{status});
   },
   open(type,data={}){

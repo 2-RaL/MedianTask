@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS plans(id INTEGER PRIMARY KEY,name TEXT NOT NULL UNIQU
 CREATE TABLE IF NOT EXISTS companies(id INTEGER PRIMARY KEY,name TEXT NOT NULL,plan INTEGER NOT NULL REFERENCES plans,cap INTEGER);
 CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY,name TEXT NOT NULL,email TEXT UNIQUE NOT NULL,hash TEXT NOT NULL,role TEXT NOT NULL,company INTEGER REFERENCES companies,active INTEGER NOT NULL DEFAULT 1);
 CREATE TABLE IF NOT EXISTS projects(id INTEGER PRIMARY KEY,name TEXT NOT NULL,company INTEGER NOT NULL REFERENCES companies);
-CREATE TABLE IF NOT EXISTS tasks(id INTEGER PRIMARY KEY,title TEXT NOT NULL,details TEXT NOT NULL,project INTEGER NOT NULL REFERENCES projects,owner INTEGER REFERENCES users,status TEXT NOT NULL,priority TEXT NOT NULL,due TEXT NOT NULL,group_id INTEGER,version INTEGER DEFAULT 1);
+CREATE TABLE IF NOT EXISTS tasks(id INTEGER PRIMARY KEY,title TEXT NOT NULL,details TEXT NOT NULL,project INTEGER NOT NULL REFERENCES projects,owner INTEGER REFERENCES users,status TEXT NOT NULL,priority TEXT NOT NULL,due TEXT NOT NULL,group_id INTEGER,created_by INTEGER REFERENCES users,version INTEGER DEFAULT 1);
 CREATE TABLE IF NOT EXISTS comments(id INTEGER PRIMARY KEY,task INTEGER REFERENCES tasks ON DELETE CASCADE,author INTEGER REFERENCES users,body TEXT NOT NULL,created TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
 CREATE TABLE IF NOT EXISTS notes(id INTEGER PRIMARY KEY,user INTEGER NOT NULL REFERENCES users ON DELETE CASCADE,title TEXT NOT NULL DEFAULT '',content TEXT NOT NULL,date TEXT,created TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);
 CREATE TABLE IF NOT EXISTS note_shares(note_id INTEGER NOT NULL REFERENCES notes(id) ON DELETE CASCADE,user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,PRIMARY KEY(note_id, user_id));
@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS groups(id INTEGER PRIMARY KEY,company INTEGER NOT NUL
 CREATE TABLE IF NOT EXISTS group_members(group_id INTEGER NOT NULL REFERENCES groups ON DELETE CASCADE,user_id INTEGER NOT NULL REFERENCES users ON DELETE CASCADE,PRIMARY KEY(group_id, user_id));
 CREATE TABLE IF NOT EXISTS sessions(token TEXT PRIMARY KEY,user INTEGER REFERENCES users,expires INTEGER NOT NULL);`);
 try{db.exec('ALTER TABLE tasks ADD COLUMN group_id INTEGER REFERENCES groups(id) ON DELETE SET NULL;');}catch{}
+try{db.exec('ALTER TABLE tasks ADD COLUMN created_by INTEGER REFERENCES users(id) ON DELETE SET NULL;');}catch{}
 try{db.exec('CREATE TABLE IF NOT EXISTS note_shares(note_id INTEGER NOT NULL REFERENCES notes(id) ON DELETE CASCADE,user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,PRIMARY KEY(note_id, user_id));');}catch{}
 const one=(sql,...p)=>db.prepare(sql).get(...p);
 const all=(sql,...p)=>db.prepare(sql).all(...p);
@@ -108,7 +109,7 @@ function task(id,c,u){
   const t=one('SELECT t.*, p.company AS company_id FROM tasks t JOIN projects p ON t.project=p.id WHERE t.id=? AND p.company=?',id,c)||fail('Tapşırıq tapılmadı.',404);
   if(u&&u.role!=='admin'&&u.role!=='platform'){
     const isLead=t.group_id&&one('SELECT 1 FROM groups WHERE id=? AND lead=?',t.group_id,u.id);
-    if(t.owner!==u.id&&!isLead)fail('Yalnız sizə təyin edilən tapşırıqlara icazəniz var.',403);
+    if(t.owner!==u.id&&t.created_by!==u.id&&!isLead)fail('Yalnız sizə təyin edilən və ya yaratdığınız tapşırıqlara icazəniz var.',403);
   }
   return t;
 }
@@ -158,10 +159,10 @@ function state(u){
   }));
   const tasks=(u.role==='admin')
     ? all('SELECT t.*, g.name AS group_name, p.company AS company_id FROM tasks t JOIN projects p ON p.id=t.project LEFT JOIN groups g ON g.id=t.group_id WHERE p.company=? ORDER BY t.id', c)
-    : all('SELECT t.*, g.name AS group_name, p.company AS company_id FROM tasks t JOIN projects p ON p.id=t.project LEFT JOIN groups g ON g.id=t.group_id WHERE p.company=? AND (t.owner=? OR (t.group_id IS NOT NULL AND t.group_id IN (SELECT id FROM groups WHERE lead=?))) ORDER BY t.id', c, u.id, u.id);
+    : all('SELECT t.*, g.name AS group_name, p.company AS company_id FROM tasks t JOIN projects p ON p.id=t.project LEFT JOIN groups g ON g.id=t.group_id WHERE p.company=? AND (t.owner=? OR t.created_by=? OR (t.group_id IS NOT NULL AND t.group_id IN (SELECT id FROM groups WHERE lead=?))) ORDER BY t.id', c, u.id, u.id, u.id);
   const comments=(u.role==='admin')
     ? all('SELECT m.* FROM comments m JOIN tasks t ON t.id=m.task JOIN projects p ON p.id=t.project WHERE p.company=? ORDER BY m.id', c)
-    : all('SELECT m.* FROM comments m JOIN tasks t ON t.id=m.task JOIN projects p ON p.id=t.project WHERE p.company=? AND (t.owner=? OR (t.group_id IS NOT NULL AND t.group_id IN (SELECT id FROM groups WHERE lead=?))) ORDER BY m.id', c, u.id, u.id);
+    : all('SELECT m.* FROM comments m JOIN tasks t ON t.id=m.task JOIN projects p ON p.id=t.project WHERE p.company=? AND (t.owner=? OR t.created_by=? OR (t.group_id IS NOT NULL AND t.group_id IN (SELECT id FROM groups WHERE lead=?))) ORDER BY m.id', c, u.id, u.id, u.id);
   return {me:u,company:company(c),users:all('SELECT '+publicUser+' FROM users WHERE company=?',c),groups,projects:all('SELECT * FROM projects WHERE company=?',c),tasks,comments,notes};
 }
 function change(action,b,u){
@@ -327,9 +328,9 @@ function change(action,b,u){
       if(isEditing){
         t=task(b.id,u.company,u);
         const isLead=t.group_id&&one('SELECT 1 FROM groups WHERE id=? AND lead=?',t.group_id,u.id);
-        if(u.role!=='platform'&&u.role!=='admin'&&!isLead)fail('Şirkət administratorunun və ya qrup rəhbərinin icazəsi tələb olunur.',403);
+        if(u.role!=='platform'&&u.role!=='admin'&&!isLead&&t.owner!==u.id&&t.created_by!==u.id)fail('Şirkət administratorunun və ya tapşırıq sahibinin icazəsi tələb olunur.',403);
       }else{
-        if(u.role!=='platform')staff(u);
+        if(u.role!=='platform'&&!u.company)fail('Şirkət hesabı tələb olunur.',403);
       }
       let proj=b.project?one('SELECT * FROM projects WHERE id=?',Number(b.project)):null;
       if(!proj&&u.role==='platform'&&b.company){
@@ -387,7 +388,7 @@ function change(action,b,u){
           if(!one('SELECT id FROM users WHERE id=? AND company=? AND active=1',o,targetCompany))fail('Seçilən əməkdaş və ya rəhbər aktiv olmalıdır.');
         }
         for(const o of owners){
-          insert('INSERT INTO tasks(title,details,project,owner,status,priority,due,group_id) VALUES(?,?,?,?,?,?,?,?)',title,details,project,o,status,priority,due,groupId);
+          insert('INSERT INTO tasks(title,details,project,owner,status,priority,due,group_id,created_by) VALUES(?,?,?,?,?,?,?,?,?)',title,details,project,o,status,priority,due,groupId,u.id);
         }
       }
       break;
@@ -424,7 +425,7 @@ function change(action,b,u){
 
       run('UPDATE tasks SET owner=?, version=version+1 WHERE id=?',owners[0],t.id);
       for(let i=1;i<owners.length;i++){
-        insert('INSERT INTO tasks(title,details,project,owner,status,priority,due,group_id) VALUES(?,?,?,?,?,?,?,?)',t.title,t.details,t.project,owners[i],t.status,t.priority,t.due,t.group_id);
+        insert('INSERT INTO tasks(title,details,project,owner,status,priority,due,group_id,created_by) VALUES(?,?,?,?,?,?,?,?,?)',t.title,t.details,t.project,owners[i],t.status,t.priority,t.due,t.group_id,u.id);
       }
       break;
     }
@@ -487,7 +488,7 @@ function change(action,b,u){
       const t=task(b.id,u.company,u);
       if(action==='comment'){insert('INSERT INTO comments(task,author,body) VALUES(?,?,?)',t.id,u.id,str(b.body,3000));break;}
       if(action==='deleteTask'){
-        if(u.role!=='platform')staff(u);
+        if(u.role!=='platform'&&u.role!=='admin'&&t.created_by!==u.id)fail('Yalnız tapşırığı yaradan şəxs və ya administrator silə bilər.',403);
       }else if(u.role!=='platform'&&u.role!=='admin'&&t.owner!==u.id)fail('Yalnız sizə təyin edilən tapşırığı keçirə bilərsiniz.',403);
       if(t.version!==b.version)fail('Tapşırıq dəyişib. Yeniləyib təkrar açın.',409);
       if(action==='deleteTask')run('DELETE FROM tasks WHERE id=?',t.id);

@@ -173,6 +173,16 @@ test('Şirkətlər, limitlər, səlahiyyətlər və tapşırıqlar',async t=>{
   await post('comment', thirdSign, {id: adminTaskObj.id, body: 'İcazəsiz şərh'}, 403);
   await post('status', thirdSign, {id: adminTaskObj.id, version: adminTaskObj.version, status: 'done'}, 403);
 
+  // Test standard user (member) adding task
+  await post('task', thirdSign, {title: 'Standart User Tapşırığı', details: 'İşçinin öz tapşırığı', project: 1, status: 'todo', owner: thirdUser.id, priority: 'high'});
+  let memberCreatedTasks = (await state(thirdSign)).tasks;
+  const createdByMember = memberCreatedTasks.find(t => t.title === 'Standart User Tapşırığı');
+  assert.ok(createdByMember, 'Standard user can add tasks');
+  assert.equal(createdByMember.owner, thirdUser.id);
+  // Member updating task
+  await post('task', thirdSign, {id: createdByMember.id, version: createdByMember.version, title: 'Standart User Tapşırığı Yeniləndi', project: 1, owner: thirdUser.id, status: 'doing', priority: 'high'});
+  assert.equal((await state(thirdSign)).tasks.find(t => t.id === createdByMember.id).title, 'Standart User Tapşırığı Yeniləndi');
+
   // Super Admin creating task directly assigned to organization leader
   await post('task', root, {title: 'Qurum Rəhbərinə Birbaşa Tapşırıq', details: 'Rəhbərə tapşırıq', company: 1, target: 'leader', priority: 'high', due: '2026-12-25'});
   const leaderTask = (await state(root)).tasks.find(t => t.title === 'Qurum Rəhbərinə Birbaşa Tapşırıq');
