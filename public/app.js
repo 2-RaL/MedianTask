@@ -150,6 +150,12 @@ const app=createApp({
 
     return days;
   },
+  companyLeader(){
+    if(!this.s?.users)return null;
+    const cid=Number(this.form?.company||(this.isPlatform?this.companyFilter:this.s.me?.company));
+    if(!cid)return null;
+    return this.s.users.find(u=>u.company===cid&&u.role==='admin'&&u.active)||null;
+  },
   team(){
     return this.s.users.filter(u=>{
       if(!this.isPlatform||!this.companyFilter)return true;
@@ -161,7 +167,7 @@ const app=createApp({
   baseTasks(){
     if(!this.s?.tasks)return [];
     let list=this.s.tasks;
-    if(this.page==='mine')list=list.filter(t=>t.owner===this.s.me.id);
+    if(this.page==='mine'||(!this.admin&&!this.isPlatform))list=list.filter(t=>t.owner===this.s.me.id);
     if(this.isPlatform&&this.companyFilter&&this.companyFilter!=='platform'){
       list=list.filter(t=>t.company_id===Number(this.companyFilter));
     }
@@ -331,7 +337,29 @@ const app=createApp({
     await this.login();
   },
   async logout(){try{await this.api('logout',{});this.s=null;this.auth={email:'',password:''};this.error='';this.mobile=false}catch(e){this.notify(e.message)}},
-  go(page){this.page=page;this.project='';this.priority='';this.query='';this.companyFilter='';this.mobile=false},
+  go(page){this.page=page;this.project='';this.priority='';this.query='';if(!this.isPlatform)this.companyFilter='';this.mobile=false},
+  setCompanyFilter(cid){
+    this.companyFilter=cid;
+    if(this.project&&!this.availableProjects.some(p=>p.id===this.project)){
+      this.project='';
+    }
+  },
+  setTaskTarget(target){
+    this.taskTarget=target;
+    if(target==='leader'&&this.companyLeader){
+      this.form.owner=this.companyLeader.id;
+      this.form.owners=[this.companyLeader.id];
+    }
+  },
+  companyName(cid){
+    if(!cid)return '—';
+    const c=this.s?.companies?.find(x=>x.id===Number(cid));
+    return c?c.name:'—';
+  },
+  companyTaskCount(cid){
+    if(!this.s?.tasks)return 0;
+    return this.s.tasks.filter(t=>t.company_id===Number(cid)).length;
+  },
   roleName(r){return {platform:'Platforma administratoru',admin:'Şirkət administratoru',member:'Əməkdaş'}[r]},
   initials(n){return n.split(/\s+/).slice(0,2).map(s=>s[0]).join('').toLocaleUpperCase('az')},person(id){return this.s.users.find(u=>u.id===id)?.name||'Təyin edilməyib'},
   projectName(id){return this.s.projects.find(p=>p.id===id)?.name},projectIndex(id){return this.s.projects.findIndex(p=>p.id===id)%4},
@@ -342,7 +370,7 @@ const app=createApp({
   primaryAction(){if(this.page==='reports')return this.excel();if(['board','mine'].includes(this.page))return this.newTask('todo');this.open({plans:'plan',companies:'company',team:'user'}[this.page])},
   newTask(status){
     const projs=this.availableProjects;
-    if(!projs||!projs.length){this.notify('İlk tapşırıq üçün layihə yaradın.');return this.open('project')}
+    if(!this.isPlatform&&(!projs||!projs.length)){this.notify('İlk tapşırıq üçün layihə yaradın.');return this.open('project')}
     this.open('task',{status});
   },
   open(type,data={}){
@@ -369,14 +397,16 @@ const app=createApp({
       this.form={...data};
       this.delegateOwners=data.owner?[data.owner]:[];
     }else if(type==='task'){
-      this.taskTarget=data.group_id?'group':'users';
       const compId=this.isPlatform?(initialCompany||this.s.companies?.[0]?.id):this.s.me.company;
       const compProjs=this.isPlatform?this.s.projects.filter(p=>p.company===Number(compId)):this.s.projects;
       const compGroups=this.isPlatform?this.s.groups.filter(g=>g.company===Number(compId)):this.s.groups;
       const compUsers=this.isPlatform?this.s.users.filter(u=>u.active&&u.company===Number(compId)):this.activeUsers;
+      const leader=this.isPlatform?this.s.users.find(u=>u.active&&u.role==='admin'&&u.company===Number(compId)):null;
+
+      this.taskTarget=data.group_id?'group':(this.isPlatform&&!data.id?'leader':'users');
       const defaultProject=this.project||compProjs[0]?.id||'';
       const defaultGroup=compGroups[0]?.id||'';
-      const defaultOwner=this.page==='mine'?this.s.me.id:(compUsers[0]?.id||this.s.me.id);
+      const defaultOwner=this.page==='mine'?this.s.me.id:(this.taskTarget==='leader'&&leader?leader.id:(compUsers[0]?.id||this.s.me.id));
 
       if(data.id){
         this.form={
@@ -452,8 +482,12 @@ const app=createApp({
     }
     if(this.modal==='task'){
       if(!this.form.title?.trim()){this.error='Tapşırığın adını daxil edin.';return;}
-      if(!this.form.project){this.error='Layihə seçin.';return;}
-      if(this.taskTarget==='group'&&!this.form.id){
+      if(this.isPlatform&&!this.form.company){this.error='Şirkət seçin.';return;}
+      if(this.taskTarget==='leader'&&!this.form.id){
+        if(!this.companyLeader){this.error='Seçilmiş qurum üzrə aktiv rəhbər tapılmadı.';return;}
+        this.form.owner=this.companyLeader.id;
+        this.form.owners=[this.companyLeader.id];
+      }else if(this.taskTarget==='group'&&!this.form.id){
         if(!this.form.group){this.error='Şöbə seçin.';return;}
       }else if(this.form.id){
         if(!this.form.owner){this.error='Məsul şəxs seçilməlidir.';return;}
@@ -462,6 +496,7 @@ const app=createApp({
       }
       const payload={
         ...this.form,
+        target:this.taskTarget,
         group:(this.taskTarget==='group'||this.form.id)?this.form.group:null
       };
       this.mutate('task',payload,()=>this.close());
@@ -474,10 +509,16 @@ const app=createApp({
     const compProjs=this.s.projects.filter(p=>p.company===compId);
     const compGroups=this.s.groups.filter(g=>g.company===compId);
     const compUsers=this.s.users.filter(u=>u.active&&u.company===compId);
+    const leader=this.s.users.find(u=>u.active&&u.role==='admin'&&u.company===compId);
     this.form.project=compProjs[0]?.id||'';
     this.form.group=compGroups[0]?.id||'';
-    this.form.owner=compUsers[0]?.id||'';
-    this.form.owners=compUsers[0]?[compUsers[0].id]:[];
+    if(this.taskTarget==='leader'&&leader){
+      this.form.owner=leader.id;
+      this.form.owners=[leader.id];
+    }else{
+      this.form.owner=compUsers[0]?.id||'';
+      this.form.owners=compUsers[0]?[compUsers[0].id]:[];
+    }
   },
   openShareModal(n){
     this.sharingNote=n;
@@ -625,8 +666,9 @@ const app=createApp({
       const pr=this.priorities[t.priority]||t.priority;
       const proj=this.projectName(t.project)||'—';
       const owner=this.person(t.owner);
+      const orgCell=this.isPlatform ? `\n    <Cell ss:StyleID="CellText"><Data ss:Type="String">${esc(t.company_name || this.companyName(t.company_id))}</Data></Cell>` : '';
       return `   <Row ss:Height="22">
-    <Cell ss:StyleID="CellCenter"><Data ss:Type="Number">${t.id}</Data></Cell>
+    <Cell ss:StyleID="CellCenter"><Data ss:Type="Number">${t.id}</Data></Cell>${orgCell}
     <Cell ss:StyleID="CellText"><Data ss:Type="String">${esc(t.title)}</Data></Cell>
     <Cell ss:StyleID="CellText"><Data ss:Type="String">${esc(t.details||'')}</Data></Cell>
     <Cell ss:StyleID="CellText"><Data ss:Type="String">${esc(proj)}</Data></Cell>
@@ -683,6 +725,7 @@ const app=createApp({
  <Worksheet ss:Name="Tapşırıqlar">
   <Table>
    <Column ss:Width="45"/>
+   ${this.isPlatform ? '<Column ss:Width="140"/>' : ''}
    <Column ss:Width="200"/>
    <Column ss:Width="240"/>
    <Column ss:Width="140"/>
@@ -692,6 +735,7 @@ const app=createApp({
    <Column ss:Width="95"/>
    <Row ss:Height="28">
     <Cell ss:StyleID="Header"><Data ss:Type="String">№</Data></Cell>
+    ${this.isPlatform ? '<Cell ss:StyleID="Header"><Data ss:Type="String">Qurum</Data></Cell>' : ''}
     <Cell ss:StyleID="Header"><Data ss:Type="String">Tapşırıq</Data></Cell>
     <Cell ss:StyleID="Header"><Data ss:Type="String">Təsvir</Data></Cell>
     <Cell ss:StyleID="Header"><Data ss:Type="String">Layihə</Data></Cell>
@@ -709,9 +753,11 @@ ${rowsXml}
     const url=URL.createObjectURL(blob);
     const a=document.createElement('a');
     a.href=url;
-    a.download=(this.isPlatform?'Meridian-Platforma-Hesabat':(this.admin?'Meridian-Tapshiriqlar':'Meridian-Ferdi-Hesabat'))+'-'+this.todayDateStr+'.xls';
+    const compPart=(this.isPlatform&&this.companyFilter&&this.companyFilter!=='platform')?('-'+this.companyName(this.companyFilter)):(this.isPlatform?'-Platforma':'');
+    a.download=(this.isPlatform?('Meridian'+compPart+'-Hesabat'):(this.admin?'Meridian-Tapshiriqlar':'Meridian-Ferdi-Hesabat'))+'-'+this.todayDateStr+'.xls';
     a.click();
     setTimeout(()=>URL.revokeObjectURL(url),1000);
+  },
   },
   csv(){const tasks=this.reportTasks;const rows=[['Tapşırıq','Layihə','Məsul şəxs','Mərhələ','Prioritet','Son tarix'],...tasks.map(t=>[t.title,this.projectName(t.project),this.person(t.owner),this.statuses[t.status],this.priorities[t.priority],t.due])];const quote=v=>'"'+String(v||'').replace(/^[\s]*[=+@-]/,m=>"'"+m).replaceAll('"','""')+'"';const url=URL.createObjectURL(new Blob(['\uFEFF'+rows.map(r=>r.map(quote).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download=(this.admin?'Meridian-Umumi-Hesabat.csv':'Meridian-Ferdi-Hesabat.csv');a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}
  }

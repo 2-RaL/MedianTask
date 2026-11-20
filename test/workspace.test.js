@@ -145,6 +145,35 @@ test('Şirkətlər, limitlər, səlahiyyətlər və tapşırıqlar',async t=>{
   await post('deleteTask', root, {id: superTask.id, version: superTask.version});
   assert.ok(!(await state(root)).tasks.some(t => t.id === superTask.id));
 
+  // Test task visibility scoping: members only see assigned tasks, company admin sees all
+  await post('task', a, {title: 'Admin Tapşırığı', details: 'Rəhbər işi', project: 1, status: 'todo', owner: aUser.id, priority: 'normal'});
+  await post('task', a, {title: 'Üçüncü işçi tapşırığı', details: 'Tək şəxsə iş', project: 1, status: 'todo', owner: thirdUser.id, priority: 'normal'});
+
+  const thirdTasks = (await state(thirdSign)).tasks;
+  assert.ok(thirdTasks.some(t => t.title === 'Üçüncü işçi tapşırığı'), 'Member should see assigned task');
+  assert.ok(!thirdTasks.some(t => t.title === 'Admin Tapşırığı'), 'Member must not see unassigned task');
+
+  const adminTasks = (await state(a)).tasks;
+  assert.ok(adminTasks.some(t => t.title === 'Üçüncü işçi tapşırığı'), 'Company admin sees member tasks');
+  assert.ok(adminTasks.some(t => t.title === 'Admin Tapşırığı'), 'Company admin sees all company tasks');
+
+  const adminTaskObj = adminTasks.find(t => t.title === 'Admin Tapşırığı');
+  await post('comment', thirdSign, {id: adminTaskObj.id, body: 'İcazəsiz şərh'}, 403);
+  await post('status', thirdSign, {id: adminTaskObj.id, version: adminTaskObj.version, status: 'done'}, 403);
+
+  // Super Admin creating task directly assigned to organization leader
+  await post('task', root, {title: 'Qurum Rəhbərinə Birbaşa Tapşırıq', details: 'Rəhbərə tapşırıq', company: 1, target: 'leader', priority: 'high', due: '2026-12-25'});
+  const leaderTask = (await state(root)).tasks.find(t => t.title === 'Qurum Rəhbərinə Birbaşa Tapşırıq');
+  assert.ok(leaderTask, 'Super admin created task for organization leader');
+  assert.equal(leaderTask.owner, aUser.id, 'Task assigned to company 1 admin');
+  assert.ok((await state(a)).tasks.some(t => t.id === leaderTask.id), 'Company leader sees the task assigned by super admin');
+
+  // Super Admin task organization filtering verification
+  const allRootTasks = (await state(root)).tasks;
+  const comp1Tasks = allRootTasks.filter(t => t.company_id === 1);
+  assert.ok(comp1Tasks.length > 0);
+  assert.ok(comp1Tasks.every(t => t.company_id === 1));
+
   // Super Admin creating calendar note
   await post('note', root, {title: 'Super Qeyd', content: 'Kalendar qeydi', date: '2026-11-20'});
   assert.ok((await state(root)).notes.some(n => n.title === 'Super Qeyd'));

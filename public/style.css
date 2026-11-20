@@ -1531,3 +1531,153 @@ tr.row-overdue td:first-child {
   color: var(--ink);
   line-height: 1.5;
 }
+
+/* Organization Filter Bar & Tabs for Super Admin */
+.org-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.org-filter-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.org-filter-tabs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.org-filter-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.org-filter-tabs button:hover {
+  background: #f1f0e9;
+  border-color: #cbd5e1;
+}
+.org-filter-tabs button.selected {
+  background: var(--green);
+  border-color: var(--green);
+  color: #fff;
+  font-weight: 600;
+  box-shadow: 0 1px 4px rgba(18, 53, 36, 0.25);
+}
+.tab-count {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 700;
+  background: rgba(0, 0, 0, 0.08);
+  color: inherit;
+}
+.org-filter-tabs button.selected .tab-count {
+  background: rgba(255, 255, 255, 0.25);
+  color: #fff;
+}
+
+/* Card & Table Organization Tags */
+.card-top-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.card-org-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 6px;
+  background: #eef3ef;
+  color: #1a4f32;
+  border-radius: 4px;
+  border: 1px solid #d4e5d8;
+  white-space: nowrap;
+}
+.card-org-tag .ico {
+  width: 11px;
+  height: 11px;
+}
+.badge-org {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  background: #f1f5f9;
+  color: #334155;
+  border-radius: 4px;
+  border: 1px solid #e2e8f0;
+}
+
+/* Leader Assignment Card in Modal */
+.leader-assign-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: #fbf9f1;
+  border: 1px solid #e5dcbe;
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+}
+.leader-assign-card .avatar {
+  width: 36px;
+  height: 36px;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+.leader-details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.leader-badge {
+  display: inline-block;
+  align-self: flex-start;
+  background: #806329;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  margin-bottom: 2px;
+}
+.leader-email {
+  color: var(--muted);
+  font-size: 12px;
+}
+.leader-hint {
+  margin-top: 6px;
+  font-size: 11px;
+  color: #635327;
+  line-height: 1.4;
+}

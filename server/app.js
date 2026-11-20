@@ -105,7 +105,12 @@ const companySQL='SELECT c.*,p.name AS package,coalesce(c.cap,p.seats) AS seats,
 function company(id){return one(companySQL+' WHERE c.id=?',id)||fail('Şirkət tapılmadı.',404);}
 function task(id,c,u){
   if(u?.role==='platform')return one('SELECT t.*, p.company AS company_id FROM tasks t JOIN projects p ON t.project=p.id WHERE t.id=?',id)||fail('Tapşırıq tapılmadı.',404);
-  return one('SELECT t.*, p.company AS company_id FROM tasks t JOIN projects p ON t.project=p.id WHERE t.id=? AND p.company=?',id,c)||fail('Tapşırıq tapılmadı.',404);
+  const t=one('SELECT t.*, p.company AS company_id FROM tasks t JOIN projects p ON t.project=p.id WHERE t.id=? AND p.company=?',id,c)||fail('Tapşırıq tapılmadı.',404);
+  if(u&&u.role!=='admin'&&u.role!=='platform'){
+    const isLead=t.group_id&&one('SELECT 1 FROM groups WHERE id=? AND lead=?',t.group_id,u.id);
+    if(t.owner!==u.id&&!isLead)fail('Yalnız sizə təyin edilən tapşırıqlara icazəniz var.',403);
+  }
+  return t;
 }
 function staff(u){if(u.role!=='admin')fail('Şirkət administratorunun icazəsi tələb olunur.',403);}
 function platform(u){if(u.role!=='platform')fail('Platforma administratorunun icazəsi tələb olunur.',403);}
@@ -151,8 +156,13 @@ function state(u){
     ...g,
     member_ids:JSON.parse(g.member_ids||'[]')
   }));
-  const tasks=all('SELECT t.*, g.name AS group_name, p.company AS company_id FROM tasks t JOIN projects p ON p.id=t.project LEFT JOIN groups g ON g.id=t.group_id WHERE p.company=? ORDER BY t.id', c);
-  return {me:u,company:company(c),users:all('SELECT '+publicUser+' FROM users WHERE company=?',c),groups,projects:all('SELECT * FROM projects WHERE company=?',c),tasks,comments:all('SELECT m.* FROM comments m JOIN tasks t ON t.id=m.task JOIN projects p ON p.id=t.project WHERE p.company=? ORDER BY m.id',c),notes};
+  const tasks=(u.role==='admin')
+    ? all('SELECT t.*, g.name AS group_name, p.company AS company_id FROM tasks t JOIN projects p ON p.id=t.project LEFT JOIN groups g ON g.id=t.group_id WHERE p.company=? ORDER BY t.id', c)
+    : all('SELECT t.*, g.name AS group_name, p.company AS company_id FROM tasks t JOIN projects p ON p.id=t.project LEFT JOIN groups g ON g.id=t.group_id WHERE p.company=? AND (t.owner=? OR (t.group_id IS NOT NULL AND t.group_id IN (SELECT id FROM groups WHERE lead=?))) ORDER BY t.id', c, u.id, u.id);
+  const comments=(u.role==='admin')
+    ? all('SELECT m.* FROM comments m JOIN tasks t ON t.id=m.task JOIN projects p ON p.id=t.project WHERE p.company=? ORDER BY m.id', c)
+    : all('SELECT m.* FROM comments m JOIN tasks t ON t.id=m.task JOIN projects p ON p.id=t.project WHERE p.company=? AND (t.owner=? OR (t.group_id IS NOT NULL AND t.group_id IN (SELECT id FROM groups WHERE lead=?))) ORDER BY m.id', c, u.id, u.id);
+  return {me:u,company:company(c),users:all('SELECT '+publicUser+' FROM users WHERE company=?',c),groups,projects:all('SELECT * FROM projects WHERE company=?',c),tasks,comments,notes};
 }
 function change(action,b,u){
   switch(action){
@@ -304,12 +314,21 @@ function change(action,b,u){
       }else{
         if(u.role!=='platform')staff(u);
       }
-      const proj=one('SELECT * FROM projects WHERE id=?',Number(b.project));
+      let proj=b.project?one('SELECT * FROM projects WHERE id=?',Number(b.project)):null;
+      if(!proj&&u.role==='platform'&&b.company){
+        const compId=Number(b.company);
+        let p=one('SELECT * FROM projects WHERE company=? ORDER BY id LIMIT 1',compId);
+        if(!p&&one('SELECT id FROM companies WHERE id=?',compId)){
+          const newPId=insert('INSERT INTO projects(name,company) VALUES(?,?)','Əsas Layihə',compId);
+          p=one('SELECT * FROM projects WHERE id=?',newPId);
+        }
+        proj=p;
+      }
       if(!proj||(u.role!=='platform'&&proj.company!==u.company))fail('Layihə seçin.');
       const targetCompany=proj.company;
       const due=b.due||'';if(due&&(!/^\d{4}-\d{2}-\d{2}$/.test(due)||isNaN(Date.parse(due))||new Date(due).toISOString().slice(0,10)!==due))fail('Tarixi yoxlayın.');
-      const status=choose(b.status,statuses);
-      const priority=choose(b.priority,priorities);
+      const status=choose(b.status||'todo',statuses);
+      const priority=choose(b.priority||'normal',priorities);
       const title=str(b.title,200);
       const details=b.details?str(b.details,5000):'';
       const project=proj.id;
@@ -333,7 +352,11 @@ function change(action,b,u){
         if(!run('UPDATE tasks SET title=?,details=?,project=?,owner=?,status=?,priority=?,due=?,group_id=?,version=version+1 WHERE id=? AND version=?',title,details,project,owner,status,priority,due,finalGroupId,b.id,b.version).changes)fail('Tapşırıq dəyişib. Yeniləyib təkrar açın.',409);
       }else{
         let owners=[];
-        if(groupId){
+        if(b.target==='leader'){
+          const leadUser=one("SELECT id FROM users WHERE company=? AND role='admin' AND active=1 ORDER BY id LIMIT 1",targetCompany);
+          if(!leadUser)fail('Qurum üzrə aktiv rəhbər tapılmadı.');
+          owners=[leadUser.id];
+        }else if(groupId){
           const grp=one('SELECT lead FROM groups WHERE id=?',groupId);
           owners=[grp.lead];
         }else if(Array.isArray(b.owners)){
@@ -342,9 +365,9 @@ function change(action,b,u){
           owners=[Number(b.owner)];
         }
         owners=[...new Set(owners)];
-        if(!owners.length)fail('Tapşırıq üçün ən azı bir məsul şəxs və ya şöbə seçilməlidir.');
+        if(!owners.length)fail('Tapşırıq üçün ən azı bir məsul şəxs, qurum rəhbəri və ya şöbə seçilməlidir.');
         for(const o of owners){
-          if(!one('SELECT id FROM users WHERE id=? AND company=? AND active=1',o,targetCompany))fail('Seçilən əməkdaş aktiv olmalıdır.');
+          if(!one('SELECT id FROM users WHERE id=? AND company=? AND active=1',o,targetCompany))fail('Seçilən əməkdaş və ya rəhbər aktiv olmalıdır.');
         }
         for(const o of owners){
           insert('INSERT INTO tasks(title,details,project,owner,status,priority,due,group_id) VALUES(?,?,?,?,?,?,?,?)',title,details,project,o,status,priority,due,groupId);
