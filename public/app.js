@@ -21,8 +21,10 @@ const app=createApp({
   calYear:new Date().getFullYear(),
   calMonth:new Date().getMonth(),
   selectedDate:new Date().toISOString().slice(0,10),
-  newDateNote:{title:'',content:''},
+  newDateNote:{title:'',content:'',shared_with:[]},
   newFreeNote:{title:'',content:''},
+  sharingNote:null,
+  shareUserIds:[],
   teamTab:'members',
   taskTarget:'users',
   delegateOwners:[]
@@ -30,7 +32,15 @@ const app=createApp({
  computed:{
   isPlatform(){return this.s?.me.role==='platform'},admin(){return this.s?.me.role==='admin'},
   nav(){
-    if(this.isPlatform)return [['companies','Şirkətlər','company'],['plans','Paketlər','box'],['team','İstifadəçilər','team']];
+    if(this.isPlatform)return [
+      ['board','Tapşırıq lövhəsi','board'],
+      ['mine','Mənim tapşırıqlarım','check'],
+      ['notes','Qeydlər','date'],
+      ['reports','Hesabatlar','report'],
+      ['companies','Şirkətlər','company'],
+      ['plans','Paketlər','box'],
+      ['team','İstifadəçilər','team']
+    ];
     return [
       ['board','Tapşırıq lövhəsi','board'],
       ['mine','Mənim tapşırıqlarım','check'],
@@ -41,13 +51,13 @@ const app=createApp({
   },
   pageName(){return this.nav.find(n=>n[0]===this.page)?.[1]},
   sub(){
-    const reportsSub = this.admin
-      ? 'Layihələrin gedişatı və komandanın cari iş yükü.'
+    const reportsSub = (this.admin || this.isPlatform)
+      ? 'Layihələrin gedişatı və komandanın cari iş yükü analitikası.'
       : 'Sizə həvalə edilmiş tapşırıqların gedişatı və fərdi icra analitikası.';
     return {
       board:'Layihələr üzrə tapşırıqlar və onların icra vəziyyəti.',
       mine:'Sizə həvalə edilmiş tapşırıqlar və son tarixlər.',
-      notes:'Şəxsi təqvim qeydləri, xatırlatmalar və sərbəst qeydlər.',
+      notes:'Şəxsi və paylaşılan təqvim qeydləri, xatırlatmalar və sərbəst qeydlər.',
       reports:reportsSub,
       companies:'Şirkətlərin paketləri, administratorları və istifadəçi yerləri.',
       plans:'Şirkətlər üçün standart paketlər və istifadəçi limitləri.',
@@ -148,9 +158,39 @@ const app=createApp({
     });
   },
   filtered(){return this.baseTasks.filter(t=>(!this.project||t.project===this.project)&&(!this.priority||t.priority===this.priority)&&(!this.query||t.title.toLocaleLowerCase('az').includes(this.query.trim().toLocaleLowerCase('az'))))},
-  baseTasks(){return this.s.tasks.filter(t=>this.page!=='mine'||t.owner===this.s.me.id)},
+  baseTasks(){
+    if(!this.s?.tasks)return [];
+    let list=this.s.tasks;
+    if(this.page==='mine')list=list.filter(t=>t.owner===this.s.me.id);
+    if(this.isPlatform&&this.companyFilter&&this.companyFilter!=='platform'){
+      list=list.filter(t=>t.company_id===Number(this.companyFilter));
+    }
+    return list;
+  },
+  availableProjects(){
+    if(!this.s?.projects)return [];
+    if(this.isPlatform&&this.companyFilter&&this.companyFilter!=='platform'){
+      return this.s.projects.filter(p=>p.company===Number(this.companyFilter));
+    }
+    return this.s.projects;
+  },
+  shareableUsers(){
+    const myId=this.s?.me?.id;
+    let list=(this.s?.users||[]).filter(u=>u.active&&u.id!==myId);
+    if(!this.isPlatform&&this.s?.me?.company){
+      list=list.filter(u=>u.company===this.s.me.company);
+    }else if(this.isPlatform&&this.companyFilter&&this.companyFilter!=='platform'){
+      list=list.filter(u=>u.company===Number(this.companyFilter));
+    }
+    return list;
+  },
   reportTasks(){
     if(!this.s?.tasks)return [];
+    if(this.isPlatform){
+      return this.companyFilter&&this.companyFilter!=='platform'
+        ? this.s.tasks.filter(t=>t.company_id===Number(this.companyFilter))
+        : this.s.tasks;
+    }
     return this.admin ? this.s.tasks : this.s.tasks.filter(t=>t.owner===this.s.me.id);
   },
   boardMetrics(){
@@ -192,7 +232,7 @@ const app=createApp({
     ];
 
     const C=251.327;let offset=0;
-    const donutSegments=priorities.map(p=>{
+    const donutSegments=priorities.filter(p=>p.count>0).map(p=>{
       const strokeDash=total?(p.count/total)*C:0;
       const currentOffset=offset;
       offset+=strokeDash;
@@ -205,7 +245,11 @@ const app=createApp({
   reportProjects(){
     if(!this.s?.projects)return [];
     const t=this.reportTasks;
-    const list=this.admin?this.s.projects:this.s.projects.filter(p=>t.some(task=>task.project===p.id));
+    const list=(this.admin || this.isPlatform)
+      ? (this.isPlatform && this.companyFilter && this.companyFilter !== 'platform'
+          ? this.s.projects.filter(p => p.company === Number(this.companyFilter))
+          : this.s.projects)
+      : this.s.projects.filter(p=>t.some(task=>task.project===p.id));
     return list.map(p=>{
       const pTasks=t.filter(task=>task.project===p.id);
       const total=pTasks.length;
@@ -219,10 +263,14 @@ const app=createApp({
     });
   },
   reportUsers(){
-    if(!this.admin||!this.s?.users)return [];
-    const activeTasks=this.s.tasks;
-    const maxUserTasks=Math.max(...this.s.users.map(u=>activeTasks.filter(t=>t.owner===u.id).length),1);
-    return this.s.users
+    if((!this.admin&&!this.isPlatform)||!this.s?.users)return [];
+    let users=this.s.users;
+    if(this.isPlatform&&this.companyFilter&&this.companyFilter!=='platform'){
+      users=users.filter(u=>u.company===Number(this.companyFilter));
+    }
+    const activeTasks=this.reportTasks;
+    const maxUserTasks=Math.max(...users.map(u=>activeTasks.filter(t=>t.owner===u.id).length),1);
+    return users
       .filter(u=>u.active||activeTasks.some(t=>t.owner===u.id&&t.status!=='done'))
       .map(u=>{
         const uTasks=activeTasks.filter(t=>t.owner===u.id);
@@ -236,8 +284,9 @@ const app=createApp({
   },
   platformMetrics(){return [['Şirkətlər',this.s.companies.length,'company'],['Aktiv hesablar',this.s.users.filter(u=>u.active).length,'team'],['Paketlər',this.s.plans.length,'box'],['Boş yerlər',this.s.companies.reduce((n,c)=>n+c.seats-c.used,0),'grid']]},
   current(){return this.s?.tasks?.find(t=>t.id===this.form.id)},
-  actionLabel(){if(this.page==='reports')return 'Excel yüklə';if(this.page==='notes'||(!this.admin&&!this.isPlatform))return '';return {board:'Yeni tapşırıq',mine:'Yeni tapşırıq',team:'İstifadəçi əlavə et',companies:'Şirkət əlavə et',plans:'Yeni paket'}[this.page]},
+  actionLabel(){if(this.page==='reports')return 'Excel yüklə';if(this.page==='notes')return '';return (this.admin||this.isPlatform)?{board:'Yeni tapşırıq',mine:'Yeni tapşırıq',team:'İstifadəçi əlavə et',companies:'Şirkət əlavə et',plans:'Yeni paket'}[this.page]||'':'';},
   modalTitle(){
+    if(this.modal==='shareNote')return 'Qeydi paylaş';
     if(this.modal==='profile')return 'Profil məlumatları';
     if(this.modal==='group')return this.form.id?'Şöbəni redaktə et':'Yeni şöbə / qrup yarat';
     if(this.modal==='deleteGroup')return 'Şöbə silinsin?';
@@ -266,7 +315,7 @@ const app=createApp({
  },
  methods:{
   async api(path,body){const r=await fetch('/api/'+path,body===undefined?{}:{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const d=await r.json();if(!r.ok){if(r.status===401&&this.s){this.close();this.s=null}throw Object.assign(Error(d.error),{status:r.status})}return d},
-  async restore(){this.s=await this.api('state');this.go(this.isPlatform?'companies':'board')},
+  async restore(){this.s=await this.api('state');if(!this.page||!this.nav.some(n=>n[0]===this.page))this.go(this.isPlatform?'companies':'board');},
   async login(){this.busy=true;this.error='';try{await this.api('login',this.auth);await this.restore();this.auth.password=''}catch(e){this.error=e.message}finally{this.busy=false}},
   fillUser(u){
     if(this.busy)return;
@@ -291,10 +340,14 @@ const app=createApp({
   percent(id){const t=this.s.tasks.filter(t=>t.project===id);return t.length?Math.round(100*t.filter(t=>t.status==='done').length/t.length):0},
   notify(msg){this.toast=msg;clearTimeout(this.timer);this.timer=setTimeout(()=>this.toast='',3200)},
   primaryAction(){if(this.page==='reports')return this.excel();if(['board','mine'].includes(this.page))return this.newTask('todo');this.open({plans:'plan',companies:'company',team:'user'}[this.page])},
-  newTask(status){if(!this.s.projects.length){this.notify('İlk tapşırıq üçün layihə yaradın.');return this.open('project')}this.open('task',{status})},
+  newTask(status){
+    const projs=this.availableProjects;
+    if(!projs||!projs.length){this.notify('İlk tapşırıq üçün layihə yaradın.');return this.open('project')}
+    this.open('task',{status});
+  },
   open(type,data={}){
     this.mobile=false;this.error='';this.note='';this.modal=type;
-    const initialCompany=(data.company!==undefined&&data.company!==null)?data.company:(this.companyFilter&&this.companyFilter!=='platform'?Number(this.companyFilter):(this.s.companies?.[0]?.id||''));
+    const initialCompany=(data.company!==undefined&&data.company!==null)?data.company:(data.company_id!==undefined&&data.company_id!==null)?data.company_id:(this.companyFilter&&this.companyFilter!=='platform'?Number(this.companyFilter):(this.s.companies?.[0]?.id||''));
     if(type==='profile'){
       this.form={
         name:this.s.me.name,
@@ -305,6 +358,7 @@ const app=createApp({
       const activeFirst=this.activeUsers[0]?.id||'';
       this.form={
         id:data.id||null,
+        company:data.company||initialCompany,
         name:data.name||'',
         lead:data.lead||activeFirst,
         members:data.member_ids?[...data.member_ids]:(activeFirst?[activeFirst]:[])
@@ -316,12 +370,21 @@ const app=createApp({
       this.delegateOwners=data.owner?[data.owner]:[];
     }else if(type==='task'){
       this.taskTarget=data.group_id?'group':'users';
+      const compId=this.isPlatform?(initialCompany||this.s.companies?.[0]?.id):this.s.me.company;
+      const compProjs=this.isPlatform?this.s.projects.filter(p=>p.company===Number(compId)):this.s.projects;
+      const compGroups=this.isPlatform?this.s.groups.filter(g=>g.company===Number(compId)):this.s.groups;
+      const compUsers=this.isPlatform?this.s.users.filter(u=>u.active&&u.company===Number(compId)):this.activeUsers;
+      const defaultProject=this.project||compProjs[0]?.id||'';
+      const defaultGroup=compGroups[0]?.id||'';
+      const defaultOwner=this.page==='mine'?this.s.me.id:(compUsers[0]?.id||this.s.me.id);
+
       if(data.id){
         this.form={
           id:data.id,
           version:data.version,
           title:data.title,
           details:data.details||'',
+          company:data.company_id||initialCompany,
           project:data.project,
           group:data.group_id||'',
           owner:data.owner||'',
@@ -331,13 +394,11 @@ const app=createApp({
           due:data.due||''
         };
       }else{
-        const activeIds=this.activeUsers.map(u=>u.id);
-        const defaultOwner=this.page==='mine'?this.s.me.id:(activeIds.length?activeIds[0]:this.s.me.id);
-        const defaultGroup=this.s.groups?.[0]?.id||'';
         this.form={
           title:'',
           details:'',
-          project:this.project||this.s.projects?.[0]?.id||'',
+          company:initialCompany,
+          project:defaultProject,
           group:defaultGroup,
           owner:defaultOwner,
           owners:defaultOwner?[defaultOwner]:[],
@@ -362,7 +423,7 @@ const app=createApp({
     }
     if(!this.$refs.dialog.open)this.$refs.dialog.showModal();
   },
-  close(){this.$refs.dialog?.close();this.modal='';this.error=''},detail(t){this.open('detail',t)},
+  close(){this.$refs.dialog?.close();this.modal='';this.error='';this.sharingNote=null;this.shareUserIds=[]},detail(t){this.open('detail',t)},
   async mutate(type,payload,after){if(this.busy)return;this.busy=true;this.error='';try{await this.api(type,payload);this.s=await this.api('state');after?.();this.notify('Dəyişiklik yadda saxlanıldı.')}catch(e){this.error=e.message;if(!this.modal)this.notify(e.message);if(e.status===409){try{this.s=await this.api('state')}catch{}}}finally{this.busy=false}},
   save(){
     if(this.modal==='profile'){
@@ -375,11 +436,18 @@ const app=createApp({
     if(this.modal==='group'){
       if(!this.form.name?.trim()){this.error='Şöbənin adını daxil edin.';return;}
       if(!this.form.lead){this.error='Şöbə rəhbərini seçin.';return;}
+      if(this.isPlatform&&!this.form.company){this.error='Şirkət seçin.';return;}
       this.mutate('group',this.form,()=>this.close());
       return;
     }
     if(this.modal==='deleteGroup'){
       this.mutate('deleteGroup',{id:this.form.id},()=>this.close());
+      return;
+    }
+    if(this.modal==='project'){
+      if(!this.form.name?.trim()){this.error='Layihə adını daxil edin.';return;}
+      if(this.isPlatform&&!this.form.company){this.error='Şirkət seçin.';return;}
+      this.mutate('project',this.form,()=>this.close());
       return;
     }
     if(this.modal==='task'){
@@ -400,6 +468,36 @@ const app=createApp({
       return;
     }
     this.mutate(this.modal,this.form,()=>this.close());
+  },
+  onTaskCompanyChange(){
+    const compId=Number(this.form.company);
+    const compProjs=this.s.projects.filter(p=>p.company===compId);
+    const compGroups=this.s.groups.filter(g=>g.company===compId);
+    const compUsers=this.s.users.filter(u=>u.active&&u.company===compId);
+    this.form.project=compProjs[0]?.id||'';
+    this.form.group=compGroups[0]?.id||'';
+    this.form.owner=compUsers[0]?.id||'';
+    this.form.owners=compUsers[0]?[compUsers[0].id]:[];
+  },
+  openShareModal(n){
+    this.sharingNote=n;
+    this.shareUserIds=[...(n.shared_with||[])];
+    this.modal='shareNote';
+    if(!this.$refs.dialog.open)this.$refs.dialog.showModal();
+  },
+  async saveShareNote(){
+    if(!this.sharingNote)return;
+    await this.mutate('shareNote',{
+      id:this.sharingNote.id,
+      users:this.shareUserIds
+    },()=>{
+      this.close();
+      this.notify('Qeyd seçilmiş əməkdaşlarla paylaşıldı.');
+    });
+  },
+  getSharedUserNames(userIds){
+    if(!userIds||!userIds.length)return '';
+    return userIds.map(id=>this.person(id)).filter(Boolean).join(', ');
   },
   async delegateCurrentTask(){
     if(!this.current)return;
@@ -493,10 +591,12 @@ const app=createApp({
     await this.mutate('note',{
       title:this.newDateNote.title?.trim()||'',
       content:this.newDateNote.content.trim(),
-      date:this.selectedDate
+      date:this.selectedDate,
+      shared_with:this.newDateNote.shared_with||[]
     },()=>{
       this.newDateNote.title='';
       this.newDateNote.content='';
+      this.newDateNote.shared_with=[];
       this.notify('Təqvim qeydi əlavə edildi.');
     });
   },
@@ -609,7 +709,7 @@ ${rowsXml}
     const url=URL.createObjectURL(blob);
     const a=document.createElement('a');
     a.href=url;
-    a.download=(this.admin?'Meridian-Tapshiriqlar':'Meridian-Ferdi-Hesabat')+'-'+this.todayDateStr+'.xls';
+    a.download=(this.isPlatform?'Meridian-Platforma-Hesabat':(this.admin?'Meridian-Tapshiriqlar':'Meridian-Ferdi-Hesabat'))+'-'+this.todayDateStr+'.xls';
     a.click();
     setTimeout(()=>URL.revokeObjectURL(url),1000);
   },

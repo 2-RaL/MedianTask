@@ -92,5 +92,62 @@ test('Şirkətlər, limitlər, səlahiyyətlər və tapşırıqlar',async t=>{
   assert.ok(!(await state(a)).users.some(account=>account.email==='excel-member@test.local'));
   assert.equal((await state(await sign('excel-admin@test.local'))).me.role,'admin');
   assert.equal((await state(await sign('excel-member@test.local'))).me.role,'member');
+
+  // Test note sharing
+  const aUser = (await state(a)).me;
+  const bUser = (await state(b)).me;
+  await post('note', a, {title: 'Ortaq qeyd', content: 'Paylaşılan məzmun', date: '2026-11-28', shared_with: [bUser.id]});
+  let bNotes = (await state(b)).notes;
+  const sharedToB = bNotes.find(n => n.title === 'Ortaq qeyd');
+  assert.ok(sharedToB);
+  assert.equal(sharedToB.user, aUser.id);
+  assert.equal(sharedToB.date, '2026-11-28');
+  assert.equal(sharedToB.author_name, 'Alpha Original');
+
+  // Test note share update via shareNote
+  await post('shareNote', a, {id: sharedToB.id, users: []});
+  assert.ok(!(await state(b)).notes.some(n => n.id === sharedToB.id));
+  await post('shareNote', a, {id: sharedToB.id, users: [bUser.id]});
+  assert.ok((await state(b)).notes.some(n => n.id === sharedToB.id));
+
+  // Recipient deleting removes it from recipient's view without deleting for author
+  await post('deleteNote', b, {id: sharedToB.id});
+  assert.ok(!(await state(b)).notes.some(n => n.id === sharedToB.id));
+  assert.ok((await state(a)).notes.some(n => n.id === sharedToB.id));
+
+  // Test Super Admin state and capabilities
+  const rootState = await state(root);
+  assert.ok(Array.isArray(rootState.tasks));
+  assert.ok(Array.isArray(rootState.projects));
+  assert.ok(Array.isArray(rootState.groups));
+  assert.ok(Array.isArray(rootState.notes));
+  assert.ok(rootState.tasks.length > 0);
+  assert.ok(rootState.projects.length > 0);
+
+  // Super Admin creating project under company
+  await post('project', root, {name: 'Super Layihə', company: 1});
+  const superProj = (await state(root)).projects.find(p => p.name === 'Super Layihə');
+  assert.ok(superProj);
+  assert.equal(superProj.company, 1);
+
+  // Super Admin creating task
+  await post('task', root, {title: 'Super Tapşırıq', details: 'Admin tapşırığı', project: superProj.id, status: 'todo', priority: 'high', owner: aUser.id, due: '2026-11-01'});
+  let superTask = (await state(root)).tasks.find(t => t.title === 'Super Tapşırıq');
+  assert.ok(superTask);
+  assert.equal(superTask.owner, aUser.id);
+
+  // Super Admin updating status, comment, delete
+  await post('status', root, {id: superTask.id, version: superTask.version, status: 'doing'});
+  superTask = (await state(root)).tasks.find(t => t.id === superTask.id);
+  assert.equal(superTask.status, 'doing');
+  await post('comment', root, {id: superTask.id, body: 'Super admin şərhi'});
+  assert.ok((await state(root)).comments.some(c => c.task === superTask.id));
+  await post('deleteTask', root, {id: superTask.id, version: superTask.version});
+  assert.ok(!(await state(root)).tasks.some(t => t.id === superTask.id));
+
+  // Super Admin creating calendar note
+  await post('note', root, {title: 'Super Qeyd', content: 'Kalendar qeydi', date: '2026-11-20'});
+  assert.ok((await state(root)).notes.some(n => n.title === 'Super Qeyd'));
+
   await post('logout',a,{});assert.equal((await req('state',a)).status,401);
 });

@@ -1332,3 +1332,202 @@ button.danger:hover {
   font-size: 11px;
   color: var(--muted);
 }
+
+/* Overdue Task Highlight (Gecikən tapşırıqlar qırmızı rəngdə) */
+.card.is-overdue {
+  background: #fdf2f0 !important;
+  border-color: #f1b3a6 !important;
+  border-left: 5px solid #c93b2b !important;
+  box-shadow: 0 2px 8px #a8322218 !important;
+}
+.card.is-overdue:hover {
+  background: #faeae7 !important;
+  border-color: #e28e7e !important;
+  box-shadow: 0 5px 14px #a8322224 !important;
+}
+.card.is-overdue h4 {
+  color: #792010 !important;
+}
+.card.is-overdue .projectname {
+  color: #8c3224 !important;
+}
+.card.is-overdue footer span.late {
+  color: #c93b2b !important;
+  font-weight: bold;
+}
+.card-badges {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+.overdue-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: bold;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: #f8d7da;
+  color: #842029;
+  border: 1px solid #f5c2c7;
+}
+.overdue-badge .ico {
+  width: 12px;
+  height: 12px;
+}
+.overdue-badge-inline {
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 10px;
+  font-weight: bold;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: #f8d7da;
+  color: #842029;
+  border: 1px solid #f5c2c7;
+}
+tr.row-overdue {
+  background: #fdf4f2 !important;
+}
+tr.row-overdue td {
+  color: #792010 !important;
+}
+tr.row-overdue .link {
+  color: #a82717 !important;
+  font-weight: bold;
+}
+tr.row-overdue td:first-child {
+  border-left: 3px solid #c93b2b;
+}
+
+/* Note Sharing & Calendar Badges */
+.note-share-select {
+  margin: 10px 0 12px;
+  padding: 10px 12px;
+  background: #f5f4ed;
+  border-radius: 6px;
+  border: 1px dashed #d5d7cc;
+}
+.share-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: bold;
+  color: var(--green);
+  margin-bottom: 8px;
+}
+.note-share-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.share-user-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 9px 4px 6px;
+  background: #fffefa;
+  border: 1px solid #cfd3c9;
+  border-radius: 16px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all .15s ease;
+}
+.share-user-chip input {
+  margin: 0;
+  width: 14px;
+  height: 14px;
+}
+.share-user-chip.selected {
+  background: #e2ede5;
+  border-color: #37583f;
+  color: #173a31;
+  font-weight: bold;
+}
+.date-note-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.date-note-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.badge-shared-author {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: bold;
+  padding: 2px 7px;
+  border-radius: 12px;
+  background: #e5eee6;
+  color: #2e533b;
+  border: 1px solid #c4d7c7;
+}
+.badge-shared-author .ico {
+  width: 12px;
+  height: 12px;
+}
+.badge-shared-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  padding: 2px 7px;
+  border-radius: 12px;
+  background: #f1ead7;
+  color: #795d24;
+  border: 1px solid #dfd3b2;
+}
+.badge-shared-count .ico {
+  width: 12px;
+  height: 12px;
+}
+.date-note-item.is-shared-note {
+  border-left: 3px solid #37583f;
+  background: #fafbf8;
+}
+.btn-icon-share {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  border: 1px solid #cfd5ca;
+  background: #fff;
+  color: #33443a;
+  cursor: pointer;
+}
+.btn-icon-share:hover {
+  background: #edf3ec;
+  border-color: #37583f;
+  color: #173a31;
+}
+.shared-names-list {
+  font-size: 11px;
+  color: var(--muted);
+  font-style: italic;
+  margin-left: auto;
+}
+.today-item-chip.is-shared-chip {
+  border-left: 3px solid #37583f;
+}
+.today-note-author {
+  display: block;
+  font-size: 10px;
+  color: var(--green);
+  font-weight: bold;
+  margin-bottom: 2px;
+}
+.share-modal-body p {
+  margin: 0 0 14px;
+  color: var(--ink);
+  line-height: 1.5;
+}
